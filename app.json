@@ -1,15 +1,16 @@
 {
     "id": "e3d67105-38bd-436e-8dd5-7cec2afb91a7",
     "version": "0.0.1",
-    "requiredApiVersion": "^1.4.0",
+    "requiredApiVersion": "^1.36.0",
     "iconFile": "icon.png",
     "author": {
         "name": "khelli07",
-        "homepage": "-",
-        "support": "-"
+        "homepage": "https://github.com/khelli07",
+        "support": "https://github.com/khelli07"
     },
     "name": "Smart Scheduling",
     "nameSlug": "smart-scheduling",
     "classFile": "SmartSchedulingApp.ts",
-    "description": "Scheduling app supported by AI to arrange meetings with Google Calendar."
+    "description": "Scheduling app supported by AI to arrange meetings with Google Calendar.",
+    "implements": []
 }
