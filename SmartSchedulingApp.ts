@@ -12,9 +12,11 @@ import { IAppInfo } from "@rocket.chat/apps-engine/definition/metadata";
 import {
     IUIKitResponse,
     UIKitBlockInteractionContext,
+    UIKitViewSubmitInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
-import { TemplateCommand } from "./commands/TemplateCommand";
+import { PromptCommand } from "./commands/PromptCommand";
 import { ExecuteBlockActionHandler } from "./handlers/ExecuteBlockActionHandler";
+import { ExecuteViewSubmitHandler } from "./handlers/ExecuteViewSubmitHandler";
 
 export class SmartSchedulingApp extends App {
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
@@ -24,10 +26,10 @@ export class SmartSchedulingApp extends App {
     public async extendConfiguration(
         configuration: IConfigurationExtend
     ): Promise<void> {
-        const templateCommand: TemplateCommand = new TemplateCommand(this);
+        const promptCommand: PromptCommand = new PromptCommand(this);
 
         await Promise.all([
-            configuration.slashCommands.provideSlashCommand(templateCommand),
+            configuration.slashCommands.provideSlashCommand(promptCommand),
         ]);
     }
 
@@ -39,6 +41,23 @@ export class SmartSchedulingApp extends App {
         modify: IModify
     ): Promise<IUIKitResponse> {
         const handler = new ExecuteBlockActionHandler(
+            this,
+            read,
+            http,
+            modify,
+            persistence
+        );
+        return await handler.run(context);
+    }
+
+    public async executeViewSubmitHandler(
+        context: UIKitViewSubmitInteractionContext,
+        read: IRead,
+        http: IHttp,
+        persistence: IPersistence,
+        modify: IModify
+    ) {
+        const handler = new ExecuteViewSubmitHandler(
             this,
             read,
             http,

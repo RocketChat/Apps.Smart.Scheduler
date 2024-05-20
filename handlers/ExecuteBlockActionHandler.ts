@@ -11,7 +11,7 @@ import {
     UIKitBlockInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
 
-import { dummyModal } from "../modals/dummyModal";
+import { promptModal } from "../modals/promptModal";
 
 export class ExecuteBlockActionHandler {
     constructor(
@@ -27,10 +27,14 @@ export class ExecuteBlockActionHandler {
     ): Promise<IUIKitResponse> {
         const data = context.getInteractionData();
 
-        const contextualbarBlocks = await dummyModal(
-            this.modify,
-            data.container.id
-        );
+        const contextualbarBlocks = await promptModal({
+            modify: this.modify,
+            read: this.read,
+            persistence: this.persistence,
+            http: this.http,
+            slashCommandContext: undefined,
+            uiKitContext: context,
+        });
 
         // [9] we update the contextual bar's content.
         await this.modify

@@ -10,7 +10,7 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { ExecutorProps } from "../definitions/ExecutorProps";
 
-import { dummyModal } from "../modals/dummyModal";
+import { promptModal } from "../modals/promptModal";
 
 export class CommandUtility {
     sender: IUser;
@@ -40,7 +40,14 @@ export class CommandUtility {
         const triggerId = this.context.getTriggerId() as string;
         const user = this.context.getSender();
         // [2] - then we create the blocks we will render inside the contextual bar.
-        const contextualbarBlocks = await dummyModal(this.modify);
+        const contextualbarBlocks = await promptModal({
+            modify: this.modify,
+            read: this.read,
+            persistence: this.persistence,
+            http: this.http,
+            slashCommandContext: this.context,
+            uiKitContext: undefined,
+        });
         // [3] - then call the method that opens the contextual bar. (opens triggers when the command is executed)
         await this.modify
             .getUiController()
