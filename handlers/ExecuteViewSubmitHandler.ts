@@ -43,8 +43,6 @@ export class ExecuteViewSubmitHandler {
 
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
 
-        const selectedModel =
-            view.state?.["selectModelBlockId"]["selectModelBlockId"] || "";
         const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
 
         await sendNotification(
@@ -52,12 +50,17 @@ export class ExecuteViewSubmitHandler {
             this.modify,
             user,
             room,
-            `Selected Model: ${selectedModel}\nPrompt: ${prompt}`
+            `Prompt: ${prompt}`
         );
+
+        // This is how to read the emails
+        const members = await this.read.getRoomReader().getMembers(roomId);
 
         return {
             success: true,
-            ...view,
+            roomId: roomId,
+            members: members,
+            // ...view,
         };
     }
 }

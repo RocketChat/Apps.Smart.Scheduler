@@ -53,40 +53,18 @@ export async function promptModal({
 
     const blocks = modify.getCreator().getBlockBuilder();
 
-    blocks.addInputBlock({
-        label: {
-            text: "Select Model",
-            type: TextObjectType.PLAINTEXT,
-        },
-        element: blocks.newStaticSelectElement({
-            actionId: "selectModelBlockId",
-            options: [
-                {
-                    value: "model_1",
-                    text: {
-                        type: TextObjectType.PLAINTEXT,
-                        text: "Model 1",
-                        emoji: true,
-                    },
-                },
-                {
-                    value: "model_2",
-                    text: {
-                        type: TextObjectType.PLAINTEXT,
-                        text: "Model 2",
-                        emoji: true,
-                    },
-                },
-            ],
-            placeholder: {
-                type: TextObjectType.PLAINTEXT,
-                text: "Select Model",
-            },
-        }),
-        blockId: "selectModelBlockId",
+    blocks.addSectionBlock({
+        blockId: "guideBlockId",
+        text: blocks.newMarkdownTextObject(
+            `
+            You have to follow *this* guide. Here's an example: 
+            lalala
+            `
+        ),
     });
 
     blocks.addInputBlock({
+        blockId: "promptBlockId",
         label: {
             text: "Enter the prompt",
             type: TextObjectType.PLAINTEXT,
@@ -98,12 +76,11 @@ export async function promptModal({
                 type: TextObjectType.PLAINTEXT,
             },
         }),
-        blockId: "promptBlockId",
     });
 
     return {
         id: "promptModalId",
-        title: blocks.newPlainTextObject("Prompt Modal"),
+        title: blocks.newPlainTextObject("Schedule your meeting"),
         submit: blocks.newButtonElement({
             text: blocks.newPlainTextObject("Submit"),
         }),

@@ -11,10 +11,10 @@ import {
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { CommandUtility } from "../lib/commandUtility";
 
-export class PromptCommand implements ISlashCommand {
+export class ScheduleCommand implements ISlashCommand {
     public constructor(private readonly app: SmartSchedulingApp) {}
-    public command = "prompt";
-    public i18nDescription = "cmd_description";
+    public command = "schedule";
+    public i18nDescription = "description";
     public providesPreview = false;
     public i18nParamsExample = "";
 
