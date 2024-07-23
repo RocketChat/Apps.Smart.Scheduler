@@ -57,8 +57,13 @@ export async function promptModal({
         blockId: "guideBlockId",
         text: blocks.newMarkdownTextObject(
             `
-            You have to follow *this* guide. Here's an example: 
-            lalala
+            **You have to include:**
+            1. The people with (@).
+            2. The preferred day (today, tomorrow, next Monday, etc.). If you already know the exact date, you can put that.
+            3. The preferred time (early morning, late afternoon, etc.).
+
+            **Example:**
+            Schedule a brainstorming session with @john and @alice for next Tuesday. We need to discuss the new project timeline. Late morning is preferable.
             `
         ),
     });
@@ -66,13 +71,13 @@ export async function promptModal({
     blocks.addInputBlock({
         blockId: "promptBlockId",
         label: {
-            text: "Enter the prompt",
+            text: "Prompt:",
             type: TextObjectType.PLAINTEXT,
         },
         element: blocks.newPlainTextInputElement({
             actionId: "promptBlockId",
             placeholder: {
-                text: "Enter the prompt",
+                text: "Let's get @theo, @claire, and @omar together for a strategy alignment call next Thursday. Early afternoon is preferable.",
                 type: TextObjectType.PLAINTEXT,
             },
         }),

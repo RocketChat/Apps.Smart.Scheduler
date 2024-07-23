@@ -15,9 +15,9 @@ import {
     UIKitViewSubmitInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
 import { ScheduleCommand } from "./commands/ScheduleCommand";
+import { settings } from "./constants/settings";
 import { ExecuteBlockActionHandler } from "./handlers/ExecuteBlockActionHandler";
 import { ExecuteViewSubmitHandler } from "./handlers/ExecuteViewSubmitHandler";
-
 export class SmartSchedulingApp extends App {
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
@@ -26,10 +26,13 @@ export class SmartSchedulingApp extends App {
     public async extendConfiguration(
         configuration: IConfigurationExtend
     ): Promise<void> {
-        const command: ScheduleCommand = new ScheduleCommand(this);
-
         await Promise.all([
-            configuration.slashCommands.provideSlashCommand(command),
+            ...settings.map((setting) =>
+                configuration.settings.provideSetting(setting)
+            ),
+            configuration.slashCommands.provideSlashCommand(
+                new ScheduleCommand(this)
+            ),
         ]);
     }
 

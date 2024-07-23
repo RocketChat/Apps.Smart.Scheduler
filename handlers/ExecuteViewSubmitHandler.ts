@@ -7,6 +7,8 @@ import {
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
+import { getPreferredDate, getPreferredTime } from "../core/llms";
+import { getFormattedDate } from "../lib/dateutil";
 import { sendNotification } from "../lib/messages";
 import { getInteractionRoomData } from "../lib/roomInteraction";
 
@@ -41,25 +43,42 @@ export class ExecuteViewSubmitHandler {
             };
         }
 
+        // Get room details
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
+        const members = await this.read.getRoomReader().getMembers(roomId);
 
+        // Prompting
         const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
+        const processedPrompt = `Given today is ${getFormattedDate()}. ${prompt}`;
+        const preferredDate = await getPreferredDate(
+            this.app,
+            this.http,
+            processedPrompt
+        ).then((res) => res);
+        const preferredTime = await getPreferredTime(
+            this.app,
+            this.http,
+            processedPrompt
+        ).then((res) => res);
 
+        // Send a notification to the room
         await sendNotification(
             this.read,
             this.modify,
             user,
             room,
-            `Prompt: ${prompt}`
+            `Prompt: Given today is ${getFormattedDate()}. ${prompt}
+            \n Preferred date: ${JSON.stringify(preferredDate)}
+            \n Preferred time: ${JSON.stringify(preferredTime)}
+            `
         );
-
-        // This is how to read the emails
-        const members = await this.read.getRoomReader().getMembers(roomId);
 
         return {
             success: true,
             roomId: roomId,
             members: members,
+            preferredDate,
+            preferredTime,
             // ...view,
         };
     }
