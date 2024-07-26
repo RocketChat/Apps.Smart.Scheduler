@@ -57,7 +57,7 @@ export class CommandUtility {
             }
             case 1: {
                 switch (this.command[0]) {
-                    case "login": {
+                    case "authorize": {
                         authorize(
                             this.app,
                             this.read,
