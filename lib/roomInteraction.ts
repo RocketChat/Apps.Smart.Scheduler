@@ -36,3 +36,14 @@ export const getInteractionRoomData = async (
     )) as Array<any>;
     return result && result.length ? result[0] : null;
 };
+
+export const clearInteractionRoomData = async (
+    persistence: IPersistence,
+    userId: string
+): Promise<void> => {
+    const association = new RocketChatAssociationRecord(
+        RocketChatAssociationModel.USER,
+        `${userId}#RoomId`
+    );
+    await persistence.removeByAssociation(association);
+};

@@ -31,11 +31,12 @@ async function generateChatCompletions(
         );
     }
 
-    try {
-        return JSON.parse(response.content).choices[0].message.content;
-    } catch (error) {
-        throw new Error(`Invalid response from API: ${response}`);
-    }
+    return JSON.parse(response.content);
+    // try {
+    //     return JSON.parse(response.content).choices[0].message.content;
+    // } catch (error) {
+    //     throw new Error(`Invalid response from API: ${response}`);
+    // }
 }
 
 export async function getPreferredDateTime(

@@ -42,11 +42,10 @@ export class ExecuteViewSubmitHandler {
             };
         }
 
-        // Get room details
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
         const members = await this.read.getRoomReader().getMembers(roomId);
 
-        // Prompting
+        // Prompt
         const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
         const processedPrompt = `Given today is ${getFormattedDate()}. ${prompt}`;
         try {
@@ -63,16 +62,17 @@ export class ExecuteViewSubmitHandler {
                 user,
                 room,
                 `Prompt: ${processedPrompt}
-                Emails: ${members.map((member) => member.emails).join(", ")}
+                Read room emails: ${members
+                    .map((member) => member.emails[0].address)
+                    .join(", ")}
                 `
-                // \n Preferred datetime: ${JSON.stringify(preferredDateTime)}
+                // Preferred datetime: ${JSON.stringify(preferredDateTime)}
             );
 
             return {
                 success: true,
                 roomId: roomId,
                 members: members,
-                // preferredDateTime,
                 // ...view,
             };
         } catch (e) {

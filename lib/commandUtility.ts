@@ -10,6 +10,7 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { ExecutorProps } from "../definitions/ExecutorProps";
 
+import { authorize } from "../modals/authModal";
 import { promptModal } from "../modals/promptModal";
 
 export class CommandUtility {
@@ -36,21 +37,44 @@ export class CommandUtility {
     }
 
     public async resolveCommand() {
-        // [1] - first we get the triggerId  to open the surface (without this it would not be possible to open the contextual bar)
-        const triggerId = this.context.getTriggerId() as string;
-        const user = this.context.getSender();
-        // [2] - then we create the blocks we will render inside the contextual bar.
-        const contextualbarBlocks = await promptModal({
-            modify: this.modify,
-            read: this.read,
-            persistence: this.persistence,
-            http: this.http,
-            slashCommandContext: this.context,
-            uiKitContext: undefined,
-        });
-        // [3] - then call the method that opens the contextual bar. (opens triggers when the command is executed)
-        await this.modify
-            .getUiController()
-            .openModalView(contextualbarBlocks, { triggerId }, user);
+        switch (this.command.length) {
+            case 0: {
+                const triggerId = this.context.getTriggerId() as string;
+                const user = this.context.getSender();
+
+                const contextualbarBlocks = await promptModal({
+                    modify: this.modify,
+                    read: this.read,
+                    persistence: this.persistence,
+                    http: this.http,
+                    slashCommandContext: this.context,
+                    uiKitContext: undefined,
+                });
+
+                await this.modify
+                    .getUiController()
+                    .openModalView(contextualbarBlocks, { triggerId }, user);
+            }
+            case 1: {
+                switch (this.command[0]) {
+                    case "login": {
+                        authorize(
+                            this.app,
+                            this.read,
+                            this.modify,
+                            this.sender,
+                            this.room,
+                            this.persistence
+                        );
+                    }
+                    case "help": {
+                        // TODO: Implement help command
+                    }
+                    default: {
+                        throw new Error("Invalid command");
+                    }
+                }
+            }
+        }
     }
 }

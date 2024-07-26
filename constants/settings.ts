@@ -10,11 +10,12 @@ export const settings: ISetting[] = [
         i18nDescription: "AI model to use for inference.",
         type: SettingType.SELECT,
         values: [
-            { key: "llama3-70b", i18nLabel: "Llama3 70B" },
             { key: "mistral-7b", i18nLabel: "Mistral 7B" },
+            { key: "llama3-8b", i18nLabel: "Llama3 8B" },
+            { key: "llama3-70b", i18nLabel: "Llama3 70B" },
         ],
         required: true,
         public: true,
-        packageValue: "llama3-70b",
+        packageValue: "mistral-7b",
     },
 ];
