@@ -7,7 +7,6 @@ import {
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
-import { getPreferredDate, getPreferredTime } from "../core/llms";
 import { getFormattedDate } from "../lib/dateutil";
 import { sendNotification } from "../lib/messages";
 import { getInteractionRoomData } from "../lib/roomInteraction";
@@ -50,36 +49,44 @@ export class ExecuteViewSubmitHandler {
         // Prompting
         const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
         const processedPrompt = `Given today is ${getFormattedDate()}. ${prompt}`;
-        const preferredDate = await getPreferredDate(
-            this.app,
-            this.http,
-            processedPrompt
-        ).then((res) => res);
-        const preferredTime = await getPreferredTime(
-            this.app,
-            this.http,
-            processedPrompt
-        ).then((res) => res);
+        try {
+            // const preferredDateTime = await getPreferredDateTime(
+            //     this.app,
+            //     this.http,
+            //     createPreferredDateTimePrompt(processedPrompt)
+            // ).then((res) => res);
 
-        // Send a notification to the room
-        await sendNotification(
-            this.read,
-            this.modify,
-            user,
-            room,
-            `Prompt: Given today is ${getFormattedDate()}. ${prompt}
-            \n Preferred date: ${JSON.stringify(preferredDate)}
-            \n Preferred time: ${JSON.stringify(preferredTime)}
-            `
-        );
+            // Send a notification to the room
+            await sendNotification(
+                this.read,
+                this.modify,
+                user,
+                room,
+                `Prompt: ${processedPrompt}
+                Emails: ${members.map((member) => member.emails).join(", ")}
+                `
+                // \n Preferred datetime: ${JSON.stringify(preferredDateTime)}
+            );
 
-        return {
-            success: true,
-            roomId: roomId,
-            members: members,
-            preferredDate,
-            preferredTime,
-            // ...view,
-        };
+            return {
+                success: true,
+                roomId: roomId,
+                members: members,
+                // preferredDateTime,
+                // ...view,
+            };
+        } catch (e) {
+            await sendNotification(
+                this.read,
+                this.modify,
+                user,
+                room,
+                `Error: ${e}`
+            );
+            return {
+                success: false,
+                error: e,
+            };
+        }
     }
 }

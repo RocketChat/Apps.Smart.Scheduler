@@ -57,9 +57,9 @@ export async function promptModal({
         blockId: "guideBlockId",
         text: blocks.newMarkdownTextObject(
             `
-            **You have to include:**
-            1. The people with (@).
-            2. The preferred day (today, tomorrow, next Monday, etc.). If you already know the exact date, you can put that.
+            **In your prompt, you have to include:**
+            1. Mention the people with (@).
+            2. The preferred day (today, tomorrow, next Monday, etc.). If you already know the exact date, you can put that as well.
             3. The preferred time (early morning, late afternoon, etc.).
 
             **Example:**

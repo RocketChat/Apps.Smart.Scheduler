@@ -1,6 +1,5 @@
 import { IHttp } from "@rocket.chat/apps-engine/definition/accessors";
 import { App } from "@rocket.chat/apps-engine/definition/App";
-import { ASK_OFFSET_DAYS, ASK_TIME } from "../constants/prompts";
 
 async function generateChatCompletions(
     app: App,
@@ -32,54 +31,24 @@ async function generateChatCompletions(
         );
     }
 
-    return JSON.parse(response.content).choices[0].message.content;
+    try {
+        return JSON.parse(response.content).choices[0].message.content;
+    } catch (error) {
+        throw new Error(`Invalid response from API: ${response}`);
+    }
 }
 
-export async function getPreferredDate(
+export async function getPreferredDateTime(
     app: App,
     http: IHttp,
     prompt: string
 ): Promise<string> {
+    // TODO: Move the preprocess of prompt here
+
     const body = {
         messages: [
             {
                 role: "system",
-                content: ASK_OFFSET_DAYS,
-            },
-            {
-                role: "user",
-                content: prompt,
-            },
-        ],
-        // format: "json",
-    };
-
-    const response = await generateChatCompletions(app, http, body);
-    return response;
-    // try {
-    //     const offsetDays = JSON.parse(response).offset_days;
-    //     if (offsetDays < 0) {
-    //         throw new Error("Invalid offset days");
-    //     }
-    //     return getDateWithOffsetDays(offsetDays);
-    // } catch (error) {
-    //     throw new Error(`Invalid response from AI: ${response}`);
-    // }
-}
-
-export async function getPreferredTime(
-    app: App,
-    http: IHttp,
-    prompt: string
-): Promise<string> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: ASK_TIME,
-            },
-            {
-                role: "user",
                 content: prompt,
             },
         ],
@@ -89,11 +58,12 @@ export async function getPreferredTime(
     return response;
 }
 
-export async function getGoogleCalendarAPIArguments(
+export async function getConstraintArguments(
     app: App,
     http: IHttp,
     prompt: string
-): Promise<object> {
+): Promise<string> {
+    // To get date and time for google calendar API call
     throw new Error("Not implemented");
 }
 
@@ -102,5 +72,15 @@ export async function getCommonTime(
     http: IHttp,
     prompt: string
 ): Promise<string> {
+    // To get common time for all participants
+    throw new Error("Not implemented");
+}
+
+export async function getMeetingArguments(
+    app: App,
+    http: IHttp,
+    prompt: string
+): Promise<string> {
+    // To set up a meeting with all participants
     throw new Error("Not implemented");
 }
