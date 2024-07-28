@@ -7,6 +7,8 @@ import {
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
+import { getConstraintArguments, getPreferredDateTime } from "../core/llms";
+import { createPreferredDateTimePrompt } from "../core/prompts";
 import { getFormattedDate } from "../lib/dateutil";
 import { sendNotification } from "../lib/messages";
 import { getInteractionRoomData } from "../lib/roomInteraction";
@@ -49,40 +51,47 @@ export class ExecuteViewSubmitHandler {
         const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
         const processedPrompt = `Given today is ${getFormattedDate()}. ${prompt}`;
         try {
-            // const preferredDateTime = await getPreferredDateTime(
+            // // TEST ==============
+            // const constraints = await getConstraints(
             //     this.app,
             //     this.http,
-            //     createPreferredDateTimePrompt(processedPrompt)
+            //     user,
+            //     [user.emails[0].address, "maria@marinachain.io"],
+            //     getFormattedDate()
             // ).then((res) => res);
+            // // TEST ==============
 
-            // Send a notification to the room
+            const preferredDateTime = await getPreferredDateTime(
+                this.app,
+                this.http,
+                createPreferredDateTimePrompt(processedPrompt)
+            ).then((res) => res);
+
+            const constraint = await getConstraintArguments(
+                this.app,
+                this.http,
+                JSON.stringify(preferredDateTime)
+            ).then((res) => res);
+
             await sendNotification(
                 this.read,
                 this.modify,
                 user,
                 room,
                 `Prompt: ${processedPrompt}
-                Read room emails: ${members
-                    .map((member) => member.emails[0].address)
-                    .join(", ")}
+                Preferred datetime: ${JSON.stringify(preferredDateTime)}
+                Constraint: ${constraint}
                 `
-                // Preferred datetime: ${JSON.stringify(preferredDateTime)}
             );
 
             return {
                 success: true,
                 roomId: roomId,
                 members: members,
-                // ...view,
+                preferredDateTime,
             };
         } catch (e) {
-            await sendNotification(
-                this.read,
-                this.modify,
-                user,
-                room,
-                `Error: ${e}`
-            );
+            await sendNotification(this.read, this.modify, user, room, `${e}`);
             return {
                 success: false,
                 error: e,

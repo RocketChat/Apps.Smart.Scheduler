@@ -28,7 +28,9 @@ function construnctConstraintPrompt(response: IFreeBusyResponse): string {
         } else {
             constraint += `Constraints for ${calendar}:\n`;
             busy.forEach((time) => {
-                constraint += `- Busy from ${time.start} to ${time.end}\n`;
+                constraint += `- Busy from ${time.start.split("T")[1]} to ${
+                    time.end.split("T")[1]
+                }\n`;
             });
         }
     });

@@ -13,6 +13,14 @@ import {
     storeInteractionRoomData,
 } from "../lib/roomInteraction";
 
+interface IParticipantOption {
+    text: {
+        type: TextObjectType;
+        text: string;
+    };
+    value: string;
+}
+
 export async function promptModal({
     modify,
     read,
@@ -35,6 +43,7 @@ export async function promptModal({
         slashCommandContext?.getSender() ||
         uiKitContext?.getInteractionData().user;
 
+    let participantOptions: IParticipantOption[] = [];
     if (user?.id) {
         let roomId: string;
 
@@ -49,6 +58,21 @@ export async function promptModal({
                 )
             ).roomId;
         }
+
+        const members = await read.getRoomReader().getMembers(roomId);
+        participantOptions = members
+            .sort((a, b) => {
+                return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
+            })
+            .map((member) => {
+                return {
+                    text: {
+                        type: TextObjectType.PLAINTEXT,
+                        text: member.username,
+                    },
+                    value: member.username,
+                };
+            });
     }
 
     const blocks = modify.getCreator().getBlockBuilder();
@@ -58,12 +82,11 @@ export async function promptModal({
         text: blocks.newMarkdownTextObject(
             `
             **In your prompt, you have to include:**
-            1. Mention the people with (@).
-            2. The preferred day (today, tomorrow, next Monday, etc.). If you already know the exact date, you can put that as well.
-            3. The preferred time (early morning, late afternoon, etc.).
+            1. The preferred day (today, tomorrow, next Monday, etc.). If you already know the exact date, you can put that as well.
+            2. The preferred time (early morning, late afternoon, etc.).
 
             **Example:**
-            Schedule a brainstorming session with @john and @alice for next Tuesday. We need to discuss the new project timeline. Late morning is preferable.
+            Schedule a brainstorming session for next Tuesday. We need to discuss the new project timeline. Late morning is preferable.
             `
         ),
     });
@@ -77,9 +100,26 @@ export async function promptModal({
         element: blocks.newPlainTextInputElement({
             actionId: "promptBlockId",
             placeholder: {
-                text: "Let's get @theo, @claire, and @omar together for a strategy alignment call next Thursday. Early afternoon is preferable.",
+                text: "Let's do a strategy alignment call next Thursday. Early afternoon is preferable.",
                 type: TextObjectType.PLAINTEXT,
             },
+        }),
+    });
+
+    blocks.addInputBlock({
+        blockId: "participantsBlockId",
+        label: {
+            type: TextObjectType.PLAINTEXT,
+            text: "Participants:",
+            emoji: true,
+        },
+        element: blocks.newMultiStaticElement({
+            actionId: "participantsBlockId",
+            placeholder: {
+                type: TextObjectType.PLAINTEXT,
+                text: "Select 1 or more participants",
+            },
+            options: participantOptions,
         }),
     });
 
@@ -87,7 +127,7 @@ export async function promptModal({
         id: "promptModalId",
         title: blocks.newPlainTextObject("Schedule your meeting"),
         submit: blocks.newButtonElement({
-            text: blocks.newPlainTextObject("Submit"),
+            text: blocks.newPlainTextObject("Schedule"),
         }),
         blocks: blocks.getBlocks(),
     };

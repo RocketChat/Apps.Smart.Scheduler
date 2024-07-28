@@ -25,7 +25,9 @@ export async function checkAvailability(
     );
 
     if (!response || response.statusCode !== 200) {
-        throw new Error("Error while checking availability");
+        throw new Error(
+            "Make sure you authorize the app through `/schedule authorize` first"
+        );
     }
 
     return JSON.parse(response.content || "{}");

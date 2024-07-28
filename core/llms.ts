@@ -31,12 +31,11 @@ async function generateChatCompletions(
         );
     }
 
-    return JSON.parse(response.content);
-    // try {
-    //     return JSON.parse(response.content).choices[0].message.content;
-    // } catch (error) {
-    //     throw new Error(`Invalid response from API: ${response}`);
-    // }
+    try {
+        return JSON.parse(response.content).choices[0].message.content;
+    } catch (error) {
+        throw new Error(`Invalid response from API: ${response}`);
+    }
 }
 
 export async function getPreferredDateTime(
@@ -64,8 +63,25 @@ export async function getConstraintArguments(
     http: IHttp,
     prompt: string
 ): Promise<string> {
-    // To get date and time for google calendar API call
-    throw new Error("Not implemented");
+    const body = {
+        messages: [
+            {
+                role: "system",
+                content: `Based on this prompt: ${prompt}, format it into this JSON.
+                Example:
+                {
+                    "preferredDate": "2021-09-01", // YYYY-MM-DD
+                    "timeMin": "09:00", // HH:MM
+                    "timeMax": "17:00", // HH:MM
+                }
+                `,
+            },
+        ],
+        format: "json",
+    };
+
+    const response = await generateChatCompletions(app, http, body);
+    return response;
 }
 
 export async function getCommonTime(
