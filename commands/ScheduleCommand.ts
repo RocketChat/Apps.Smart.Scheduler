@@ -9,7 +9,7 @@ import {
     SlashCommandContext,
 } from "@rocket.chat/apps-engine/definition/slashcommands";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
-import { CommandUtility } from "../lib/commandUtility";
+import { CommandUtility } from "../lib/commandUtils";
 
 export class ScheduleCommand implements ISlashCommand {
     public constructor(private readonly app: SmartSchedulingApp) {}

@@ -1,4 +1,4 @@
-export const ASK_PREFERRED_DATETIME = `
+export const PREFERRED_DATETIME_PROMPT = `
 You are an assistant who will help people to answer questions based on the prompt. Use provided information, guide, and example to answer the questions. Answer it only concisely. These are the questions you have to answer:
 Q1: When is the date? 
 Q2: What is the preferred time? 
@@ -66,4 +66,75 @@ Given today is Monday, 2024-05-06. Schedule a project kickoff meeting with @kate
 Answers:
 Q1: 2024-05-06
 Q2: Late afternoon (15:00-16:00)
+`;
+
+export const COMMON_TIME_PROMPT = `
+You are a scheduling assistant who will help a group of people to find suitable meeting time for them. The definitions of free time are
+1. Time between busy schedule, 
+2. Office hour start to the first busy schedule, or 
+3. Last busy schedule to end of office hours.
+
+Based on this prompt:
+{prompt}
+
+What is their common free time? Remember to prioritize the one inside the preferred time. Remember common time should not overlap with anyone's busy time.
+
+### This is an example ###
+Prompt:
+General Constraint
+- Preferable from 2021-12-30T01:00:00Z to 2021-12-30T04:00:00Z
+
+Me
+- Busy from 2021-12-30T02:00:00Z to 2021-12-30T02:30:00Z
+- Busy from 2021-12-30T07:00:00Z to 2021-12-30T07:30:00Z
+- Office hours from 2021-12-30T01:00:00Z to 2021-12-30T09:00:00Z
+
+James
+- Busy from 2021-12-30T04:00:00Z to 2021-12-30T05:00:00Z
+- Busy from 2021-12-30T08:30:00Z to 2021-12-30T09:00:00Z
+- Office hours from 2021-12-30T01:00:00Z to 2021-12-30T09:00:00Z
+
+Sarah
+- Busy from 2021-12-30T03:00:00Z to 2021-12-30T03:30:00Z
+- Busy from 2021-12-30T05:00:00Z to 2021-12-30T05:30:00Z
+- Busy from 2021-12-30T08:00:00Z to 2021-12-30T08:30:00Z
+- Office hours from 2021-12-30T02:00:00Z to 2021-12-30T10:00:00Z
+
+## Guide and steps to answer:
+1. Determine everyone's schedule 
+- Your Schedule:
+Busy from 02:00 to 02:30
+Busy from 07:00 to 07:30
+Office hours from 01:00 to 09:00
+- James's Schedule:
+Busy from 04:00 to 05:00
+Busy from 08:30 to 09:00
+Office hours from 01:00 to 09:00
+- Sarah's Schedule:
+Busy from 03:00 to 03:30
+Busy from 05:00 to 05:30
+Busy from 08:00 to 08:30
+Office hours from 02:00 to 10:00
+
+2. List out common free time within the preferable time.
+You: 01:00 to 02:00, 02:30 to 03.00, 03.00 to 03.30, 03.30 to 04:00
+James: 01:00 to 04:00
+Sarah: 02:00 to 03:00, 03:30 to 04:00
+
+3. Prioritize the timeslot where everyone is free. Within the preferable timeframe of 01:00 to 04:00, the common free slots are:
+02:30 to 03:00
+03:30 to 04:00
+
+Notes: If the preferable time is not available for everyone, use time outside preferable timeframe as long as everyone can join. Otherwise, do not include the one outside preferred time. Only include the one inside preferred time.
+
+4. Pick the ones within preferable time. 
+Common free times for all of you available and inside the preferred time (01:00:00Z to 04:00:00Z) are
+- 02:30:00Z to 03:00:00Z
+- 03:30:00Z to 04:00:00Z
+Exclude that is not ideal.
+
+Answer:
+- 02:30:00Z to 03:00:00Z
+- 03:30:00Z to 04:00:00Z
+### End of example ###
 `;

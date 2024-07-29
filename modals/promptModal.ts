@@ -8,18 +8,11 @@ import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashco
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
 import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder";
 import { TextObjectType } from "@rocket.chat/apps-engine/definition/uikit/blocks";
+import { IParticipantProps } from "../definitions/IParticipantProps";
 import {
     getInteractionRoomData,
     storeInteractionRoomData,
 } from "../lib/roomInteraction";
-
-interface IParticipantOption {
-    text: {
-        type: TextObjectType;
-        text: string;
-    };
-    value: string;
-}
 
 export async function promptModal({
     modify,
@@ -43,7 +36,7 @@ export async function promptModal({
         slashCommandContext?.getSender() ||
         uiKitContext?.getInteractionData().user;
 
-    let participantOptions: IParticipantOption[] = [];
+    let participantOptions: IParticipantProps[] = Array();
     if (user?.id) {
         let roomId: string;
 
@@ -60,19 +53,23 @@ export async function promptModal({
         }
 
         const members = await read.getRoomReader().getMembers(roomId);
-        participantOptions = members
-            .sort((a, b) => {
-                return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
-            })
-            .map((member) => {
-                return {
+        for (const member of members) {
+            if (member.id !== user.id) {
+                participantOptions.push({
                     text: {
-                        type: TextObjectType.PLAINTEXT,
-                        text: member.username,
+                        type: TextObjectType.MARKDOWN,
+                        text: `${member.name} - @${member.username} - ${member.emails[0].address}`,
                     },
-                    value: member.username,
-                };
-            });
+                    value: member.emails[0].address,
+                });
+            }
+        }
+
+        participantOptions.sort((a, b) => {
+            return a.text.text.toUpperCase() < b.text.text.toUpperCase()
+                ? -1
+                : 1;
+        });
     }
 
     const blocks = modify.getCreator().getBlockBuilder();

@@ -9,7 +9,7 @@ import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashco
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
-export interface ExecutorProps {
+export interface IExecutorProps {
     sender: IUser;
     room: IRoom;
     command: string[];

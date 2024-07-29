@@ -3,52 +3,16 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { checkAvailability } from "../lib/googleCalendarSDK";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
-interface IFreeBusyResponse {
-    kind: string;
-    timeMin: string;
-    timeMax: string;
-    calendars: {
-        [email: string]: {
-            busy: {
-                start: string;
-                end: string;
-            }[];
-        };
-    };
-}
-
-function construnctConstraintPrompt(response: IFreeBusyResponse): string {
-    const calendars = Object.keys(response.calendars);
-
-    let constraint = "";
-    calendars.forEach((calendar) => {
-        const busy = response.calendars[calendar].busy;
-        if (busy.length === 0) {
-            // constraint += `No constraints for ${calendar}\n`;
-        } else {
-            constraint += `Constraints for ${calendar}:\n`;
-            busy.forEach((time) => {
-                constraint += `- Busy from ${time.start.split("T")[1]} to ${
-                    time.end.split("T")[1]
-                }\n`;
-            });
-        }
-    });
-
-    return constraint;
-}
-
 export async function getConstraints(
     app: SmartSchedulingApp,
     http: IHttp,
     user: IUser,
     emails: string[],
     date: string
-): Promise<string> {
+): Promise<object> {
     const accessToken = await app
         .getOauth2ClientInstance()
-        .getAccessTokenForUser(user)
-        .then((res) => res);
+        .getAccessTokenForUser(user);
 
     if (!accessToken) {
         throw new Error("Access token not found");
@@ -59,12 +23,12 @@ export async function getConstraints(
     const response = await checkAvailability(
         accessToken.token,
         http,
-        emails,
+        [user.emails[0].address, ...emails],
         timeMin.toISOString(),
         timeMax.toISOString()
     );
 
-    return construnctConstraintPrompt(response as IFreeBusyResponse);
+    return response;
 }
 
 export async function setMeeting(

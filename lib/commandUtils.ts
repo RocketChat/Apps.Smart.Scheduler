@@ -8,7 +8,7 @@ import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashcommands";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
-import { ExecutorProps } from "../definitions/ExecutorProps";
+import { IExecutorProps } from "../definitions/IExecutorProps";
 
 import { authorize } from "../modals/authModal";
 import { promptModal } from "../modals/promptModal";
@@ -24,7 +24,7 @@ export class CommandUtility {
     persistence: IPersistence;
     app: SmartSchedulingApp;
 
-    constructor(props: ExecutorProps) {
+    constructor(props: IExecutorProps) {
         this.sender = props.sender;
         this.room = props.room;
         this.command = props.command;

@@ -20,14 +20,19 @@ const dateToString = (date: Date, isDay: boolean = true): string => {
     }
 };
 
-export const getFormattedDate = (): string => {
-    // TODO: add timezone
+export const getFormattedDate = (utcOffset: number): string => {
     const date = new Date();
+    date.setHours(date.getHours() + utcOffset);
     return dateToString(date);
 };
 
-export const getDateWithOffsetDays = (offsetDays: number): string => {
-    const date = new Date();
-    date.setDate(date.getDate() + offsetDays);
-    return dateToString(date);
+export const timeToUTC = (
+    date: string,
+    time: string,
+    utcOffset: number
+): string => {
+    const [hour, minute, second] = time.split(":");
+    const dateObj = new Date(`${date}T${hour}:${minute}:${second}Z`);
+    dateObj.setHours(dateObj.getHours() - utcOffset);
+    return dateObj.toISOString().slice(0, 19);
 };

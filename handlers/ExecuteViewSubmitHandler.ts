@@ -7,9 +7,11 @@ import {
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
-import { getConstraintArguments, getPreferredDateTime } from "../core/llms";
-import { createPreferredDateTimePrompt } from "../core/prompts";
-import { getFormattedDate } from "../lib/dateutil";
+import {
+    getCommonTime,
+    getConstraintPrompt,
+    getMeetingArguments,
+} from "../core/llms";
 import { sendNotification } from "../lib/messages";
 import { getInteractionRoomData } from "../lib/roomInteraction";
 
@@ -47,40 +49,49 @@ export class ExecuteViewSubmitHandler {
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
         const members = await this.read.getRoomReader().getMembers(roomId);
 
-        // Prompt
-        const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
-        const processedPrompt = `Given today is ${getFormattedDate()}. ${prompt}`;
         try {
-            // // TEST ==============
-            // const constraints = await getConstraints(
-            //     this.app,
-            //     this.http,
-            //     user,
-            //     [user.emails[0].address, "maria@marinachain.io"],
-            //     getFormattedDate()
-            // ).then((res) => res);
-            // // TEST ==============
+            const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
+            const participants =
+                view.state?.["participantsBlockId"]["participantsBlockId"] ||
+                "";
 
-            const preferredDateTime = await getPreferredDateTime(
+            // TODO: Validate user input: prompt injection, 0 participants, etc.
+            if (!prompt || !participants) {
+                throw new Error("Input should not be empty");
+            }
+
+            const constraintPrompt = await getConstraintPrompt(
                 this.app,
                 this.http,
-                createPreferredDateTimePrompt(processedPrompt)
-            ).then((res) => res);
+                user,
+                participants,
+                prompt
+            );
 
-            const constraint = await getConstraintArguments(
+            const commonTime = await getCommonTime(
                 this.app,
                 this.http,
-                JSON.stringify(preferredDateTime)
-            ).then((res) => res);
+                constraintPrompt
+            );
+
+            const meetingArgs = await getMeetingArguments(
+                this.app,
+                this.http,
+                commonTime
+            );
 
             await sendNotification(
                 this.read,
                 this.modify,
                 user,
                 room,
-                `Prompt: ${processedPrompt}
-                Preferred datetime: ${JSON.stringify(preferredDateTime)}
-                Constraint: ${constraint}
+                `Prompt: ${prompt}
+                -----------
+                Constraint: ${constraintPrompt}
+                -----------
+                Common Time: ${commonTime}
+                -----------
+                Meeting Arguments: ${meetingArgs}
                 `
             );
 
@@ -88,7 +99,6 @@ export class ExecuteViewSubmitHandler {
                 success: true,
                 roomId: roomId,
                 members: members,
-                preferredDateTime,
             };
         } catch (e) {
             await sendNotification(this.read, this.modify, user, room, `${e}`);
