@@ -74,12 +74,7 @@ You are a scheduling assistant who will help a group of people to find suitable 
 2. Office hour start to the first busy schedule, or 
 3. Last busy schedule to end of office hours.
 
-Based on this prompt:
-{prompt}
-
-What is their common free time? Remember to prioritize the one inside the preferred time. Remember common time should not overlap with anyone's busy time.
-
-### This is an example ###
+### Start of an example ###
 Prompt:
 General Constraint
 - Preferable from 2021-12-30T01:00:00Z to 2021-12-30T04:00:00Z
@@ -100,7 +95,7 @@ Sarah
 - Busy from 2021-12-30T08:00:00Z to 2021-12-30T08:30:00Z
 - Office hours from 2021-12-30T02:00:00Z to 2021-12-30T10:00:00Z
 
-## Guide and steps to answer:
+* Guide and steps to answer:
 1. Determine everyone's schedule 
 - Your Schedule:
 Busy from 02:00 to 02:30
@@ -137,4 +132,10 @@ Answer:
 - 02:30:00Z to 03:00:00Z
 - 03:30:00Z to 04:00:00Z
 ### End of example ###
+
+Based on this prompt:
+{prompt}
+
+What is their common free time? Use example above as a guide to answer the question.
+
 `;

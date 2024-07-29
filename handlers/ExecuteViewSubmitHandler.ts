@@ -8,12 +8,13 @@ import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import {
-    getCommonTime,
-    getConstraintPrompt,
+    generateCommonTime,
+    generateConstraintPrompt,
     getMeetingArguments,
 } from "../core/llms";
 import { sendNotification } from "../lib/messages";
 import { getInteractionRoomData } from "../lib/roomInteraction";
+import { confirmationModal } from "../modals/confirmationModal";
 
 export class ExecuteViewSubmitHandler {
     constructor(
@@ -60,15 +61,18 @@ export class ExecuteViewSubmitHandler {
                 throw new Error("Input should not be empty");
             }
 
-            const constraintPrompt = await getConstraintPrompt(
+            const constraintPrompt = await generateConstraintPrompt(
                 this.app,
                 this.http,
                 user,
                 participants,
-                prompt
+                prompt,
+                this.read,
+                this.modify,
+                room
             );
 
-            const commonTime = await getCommonTime(
+            const commonTime = await generateCommonTime(
                 this.app,
                 this.http,
                 constraintPrompt
@@ -85,15 +89,27 @@ export class ExecuteViewSubmitHandler {
                 this.modify,
                 user,
                 room,
-                `Prompt: ${prompt}
+                `Constraint prompt: ${constraintPrompt}
                 -----------
-                Constraint: ${constraintPrompt}
+                Common time: ${commonTime}
                 -----------
-                Common Time: ${commonTime}
-                -----------
-                Meeting Arguments: ${meetingArgs}
+                Meeting args: ${JSON.stringify(meetingArgs)}
                 `
             );
+
+            // TODO: Not working yet
+            const triggerId = context.getInteractionData().triggerId;
+            const confirmationBlocks = await confirmationModal({
+                modify: this.modify,
+                read: this.read,
+                persistence: this.persistence,
+                http: this.http,
+                summary: JSON.stringify(meetingArgs),
+            });
+
+            await this.modify
+                .getUiController()
+                .updateModalView(confirmationBlocks, { triggerId }, user);
 
             return {
                 success: true,

@@ -29,14 +29,14 @@ export function constructPreferredDateTimePrompt(
     ).replace("{days}", days);
 }
 
-export function construnctConstraintPrompt(
+export function constructConstraintPrompt(
     dateTimeMin: string,
     dateTimeMax: string,
     response: IFreeBusyResponse
 ): string {
     const calendars = Object.keys(response.calendars);
 
-    let prompt = `General Constraints
+    let prompt = `General Constraints:
     - Preferable from ${dateTimeMin} to ${dateTimeMax}\n`;
 
     calendars.forEach((calendar) => {
@@ -44,13 +44,10 @@ export function construnctConstraintPrompt(
         if (busy.length !== 0) {
             prompt += `\n${calendar}:\n`;
             busy.forEach((time) => {
-                prompt += `- Busy from ${time.start
-                    .replace("T", "")
-                    .replace("Z", "")} to ${time.end
-                    .replace("T", "")
-                    .replace("Z", "")}\n`;
+                prompt += `- Busy from ${time.start} to ${time.end}\n`;
             });
         }
+        prompt += "- Office hours from 01:00:00Z to 09:00:00Z\n"; // TODO: Hardcoded office hours
     });
 
     return COMMON_TIME_PROMPT.replace("{prompt}", prompt);
