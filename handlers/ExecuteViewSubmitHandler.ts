@@ -7,6 +7,7 @@ import {
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
+import { SubmitEnum } from "../constants/enums";
 import {
     generateCommonTime,
     generateConstraintPrompt,
@@ -48,80 +49,110 @@ export class ExecuteViewSubmitHandler {
         }
 
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
-        const members = await this.read.getRoomReader().getMembers(roomId);
 
-        try {
-            const prompt = view.state?.["promptBlockId"]["promptBlockId"] || "";
-            const participants =
-                view.state?.["participantsBlockId"]["participantsBlockId"] ||
-                "";
+        switch (view.submit?.actionId) {
+            case SubmitEnum.PROMPT_MODAL: {
+                const members = await this.read
+                    .getRoomReader()
+                    .getMembers(roomId);
 
-            // TODO: Validate user input: prompt injection, 0 participants, etc.
-            if (!prompt || !participants) {
-                throw new Error("Input should not be empty");
+                try {
+                    const prompt =
+                        view.state?.["promptBlockId"]["promptBlockId"] || "";
+                    const participants =
+                        view.state?.["participantsBlockId"][
+                            "participantsBlockId"
+                        ] || "";
+
+                    // TODO: Validate user input: prompt injection, 0 participants, etc.
+                    if (!prompt || !participants) {
+                        throw new Error("Input should not be empty");
+                    }
+
+                    const triggerId = context.getInteractionData().triggerId;
+                    const modal = await confirmationModal({
+                        modify: this.modify,
+                        read: this.read,
+                        persistence: this.persistence,
+                        http: this.http,
+                        uiKitContext: context,
+                        summary: `
+                        Participants: ${participants}
+                        `,
+                    });
+
+                    await this.modify
+                        .getUiController()
+                        .openModalView(modal, { triggerId }, user);
+
+                    const constraintPrompt = await generateConstraintPrompt(
+                        this.app,
+                        this.http,
+                        user,
+                        participants,
+                        prompt,
+                        this.read,
+                        this.modify,
+                        room
+                    );
+
+                    const commonTime = await generateCommonTime(
+                        this.app,
+                        this.http,
+                        constraintPrompt
+                    );
+
+                    const meetingArgs = await getMeetingArguments(
+                        this.app,
+                        this.http,
+                        commonTime
+                    );
+
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        `Constraint prompt: ${constraintPrompt}
+                        -----------
+                        Common time: ${commonTime}
+                        -----------
+                        Meeting arguments: ${JSON.stringify(meetingArgs)}
+                        `
+                    );
+
+                    return {
+                        success: true,
+                        roomId: roomId,
+                        members: members,
+                    };
+                } catch (e) {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        `${e}`
+                    );
+                    return {
+                        success: false,
+                        error: e,
+                    };
+                }
             }
-
-            const constraintPrompt = await generateConstraintPrompt(
-                this.app,
-                this.http,
-                user,
-                participants,
-                prompt,
-                this.read,
-                this.modify,
-                room
-            );
-
-            const commonTime = await generateCommonTime(
-                this.app,
-                this.http,
-                constraintPrompt
-            );
-
-            const meetingArgs = await getMeetingArguments(
-                this.app,
-                this.http,
-                commonTime
-            );
-
-            await sendNotification(
-                this.read,
-                this.modify,
-                user,
-                room,
-                `Constraint prompt: ${constraintPrompt}
-                -----------
-                Common time: ${commonTime}
-                -----------
-                Meeting args: ${JSON.stringify(meetingArgs)}
-                `
-            );
-
-            // TODO: Not working yet
-            const triggerId = context.getInteractionData().triggerId;
-            const confirmationBlocks = await confirmationModal({
-                modify: this.modify,
-                read: this.read,
-                persistence: this.persistence,
-                http: this.http,
-                summary: JSON.stringify(meetingArgs),
-            });
-
-            await this.modify
-                .getUiController()
-                .updateModalView(confirmationBlocks, { triggerId }, user);
-
-            return {
-                success: true,
-                roomId: roomId,
-                members: members,
-            };
-        } catch (e) {
-            await sendNotification(this.read, this.modify, user, room, `${e}`);
-            return {
-                success: false,
-                error: e,
-            };
         }
+
+        await sendNotification(
+            this.read,
+            this.modify,
+            user,
+            room,
+            "Invalid view id"
+        );
+        return {
+            success: false,
+            error: "Invalid view id",
+            ...view,
+        };
     }
 }

@@ -11,8 +11,6 @@ import {
     UIKitBlockInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
 
-import { promptModal } from "../modals/promptModal";
-
 export class ExecuteBlockActionHandler {
     constructor(
         private readonly app: SmartSchedulingApp,
@@ -26,24 +24,11 @@ export class ExecuteBlockActionHandler {
         context: UIKitBlockInteractionContext
     ): Promise<IUIKitResponse> {
         const data = context.getInteractionData();
+        const { actionId } = data;
+        const { user, value, room } = context.getInteractionData();
 
-        const contextualbarBlocks = await promptModal({
-            modify: this.modify,
-            read: this.read,
-            persistence: this.persistence,
-            http: this.http,
-            slashCommandContext: undefined,
-            uiKitContext: context,
-        });
-
-        // [9] we update the contextual bar's content.
-        await this.modify
-            .getUiController()
-            .updateModalView(
-                contextualbarBlocks,
-                { triggerId: data.triggerId },
-                data.user
-            );
+        switch (actionId) {
+        }
 
         return {
             success: true,

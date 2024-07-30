@@ -42,7 +42,7 @@ export class CommandUtility {
                 const triggerId = this.context.getTriggerId() as string;
                 const user = this.context.getSender();
 
-                const contextualbarBlocks = await promptModal({
+                const modal = await promptModal({
                     modify: this.modify,
                     read: this.read,
                     persistence: this.persistence,
@@ -53,7 +53,7 @@ export class CommandUtility {
 
                 await this.modify
                     .getUiController()
-                    .openModalView(contextualbarBlocks, { triggerId }, user);
+                    .openModalView(modal, { triggerId }, user);
             }
             case 1: {
                 switch (this.command[0]) {

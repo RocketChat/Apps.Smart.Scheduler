@@ -125,10 +125,10 @@ export async function getMeetingArguments(
                 content: `Turn this prompt: 
                 ${prompt}
                 Into array of item using following format, example:
-                [{
+                {
                     "datetimeStart": "2021-09-01T09:00:00Z", // Meeting start. Use ISO 8601 format
                     "datetimeEnd": "2021-09-01T17:00:00Z", // Meeting end. Use ISO 8601 format
-                }]
+                }
                 Do not output any other information. Only use the fields above.    
                 `,
             },

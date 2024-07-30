@@ -56,7 +56,8 @@ export async function confirmationModal({
     blocks.addSectionBlock({
         blockId: "confirmationBlockId",
         text: blocks.newMarkdownTextObject(
-            `*Please confirm the following details:*`
+            `*Please confirm the following details:*
+            ${summary}`
         ),
     });
 
