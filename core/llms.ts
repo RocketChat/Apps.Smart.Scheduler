@@ -12,29 +12,44 @@ import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { getConstraints } from "./googleCalendar";
 
-async function generateChatCompletions(
+export async function generateChatCompletions(
     app: SmartSchedulingApp,
     http: IHttp,
     body: object
 ): Promise<string> {
-    const model = await app
-        .getAccessors()
-        .environmentReader.getSettings()
-        .getValueById("model");
-    const url = `http://${model}/v1`;
+    // const model = await app
+    //     .getAccessors()
+    //     .environmentReader.getSettings()
+    //     .getValueById("model");
+    // const url = `http://${model}/v1` + "/chat/completions";
+    // body = {
+    //     ...body,
+    //     model: model,
+    //     temperature: 0,
+    // };
 
+    const model = "mistral";
+    const url = "http://host.docker.internal:11434/api/chat";
     body = {
         ...body,
         model: model,
         temperature: 0,
+        options: { temperature: 0 },
+        stream: false,
     };
 
-    const response = await http.post(url + "/chat/completions", {
+    app.getLogger().debug(
+        `Request to ${url} with payload: ${JSON.stringify(body)}`
+    );
+
+    const response = await http.post(url, {
         headers: {
             "Content-Type": "application/json",
         },
         content: JSON.stringify(body),
     });
+
+    app.getLogger().debug(`Response from ${url}: ${JSON.stringify(response)}`);
 
     if (!response || !response.content) {
         throw new Error(
@@ -43,8 +58,10 @@ async function generateChatCompletions(
     }
 
     try {
-        return JSON.parse(response.content).choices[0].message.content;
+        return JSON.parse(response.content).message.content;
+        // return JSON.parse(response.content).choices[0].message.content;
     } catch (error) {
+        app.getLogger().error(`Error parsing response: ${error}`);
         throw new Error(`Invalid response from API: ${response}`);
     }
 }
@@ -73,6 +90,7 @@ export async function generateCommonTime(
     http: IHttp,
     constraintPrompt: string
 ): Promise<string> {
+    return `02:30:00Z to 03:00:00Z`;
     const body = {
         messages: [
             {
@@ -116,7 +134,12 @@ export async function getConstraintArguments(
 export async function getMeetingArguments(
     app: SmartSchedulingApp,
     http: IHttp,
-    prompt: string
+    prompt: string,
+    // DEBUG
+    user: IUser,
+    read: any,
+    modify: any,
+    room: any
 ): Promise<IMeetingArgs> {
     const body = {
         messages: [
@@ -138,6 +161,16 @@ export async function getMeetingArguments(
 
     const response = await generateChatCompletions(app, http, body);
     const args: IMeetingArgs = JSON.parse(response);
+
+    // DEBUG
+    await sendNotification(
+        read,
+        modify,
+        user,
+        room,
+        `> Generated meeting arguments: ${JSON.stringify(args)}\n`
+    );
+
     return args;
 }
 
@@ -165,7 +198,8 @@ export async function generateConstraintPrompt(
         modify,
         user,
         room,
-        `-----------
+        `Prompt: ${prompt}
+        -----------
         Preferred date time: 
         ${preferredDateTime}\n`
     );
@@ -204,7 +238,7 @@ export async function generateConstraintPrompt(
         modify,
         user,
         room,
-        `Constraints: ${JSON.stringify(constraints)} \n
+        `Constraints: ${JSON.stringify(constraints)}
         -----------`
     );
 
