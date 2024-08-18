@@ -18,6 +18,7 @@ import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import {
     IUIKitResponse,
     UIKitBlockInteractionContext,
+    UIKitViewCloseInteractionContext,
     UIKitViewSubmitInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
@@ -25,6 +26,7 @@ import { OAuth2Client } from "@rocket.chat/apps-engine/server/oauth2/OAuth2Clien
 import { ScheduleCommand } from "./commands/ScheduleCommand";
 import { settings } from "./constants/settings";
 import { ExecuteBlockActionHandler } from "./handlers/ExecuteBlockActionHandler";
+import { ExecuteViewClosedHandler } from "./handlers/ExecuteViewClosedHandler";
 import { ExecuteViewSubmitHandler } from "./handlers/ExecuteViewSubmitHandler";
 import { sendNotification } from "./lib/messages";
 import {
@@ -76,6 +78,23 @@ export class SmartSchedulingApp extends App {
         modify: IModify
     ) {
         const handler = new ExecuteViewSubmitHandler(
+            this,
+            read,
+            http,
+            modify,
+            persistence
+        );
+        return await handler.run(context);
+    }
+
+    public async executeViewClosedHandler(
+        context: UIKitViewCloseInteractionContext,
+        read: IRead,
+        http: IHttp,
+        persistence: IPersistence,
+        modify: IModify
+    ) {
+        const handler = new ExecuteViewClosedHandler(
             this,
             read,
             http,

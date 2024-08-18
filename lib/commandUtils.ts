@@ -12,6 +12,7 @@ import { IExecutorProps } from "../definitions/IExecutorProps";
 
 import { authorize } from "../modals/authModal";
 import { promptModal } from "../modals/promptModal";
+import { sendNotification } from "./messages";
 
 export class CommandUtility {
     sender: IUser;
@@ -37,44 +38,48 @@ export class CommandUtility {
     }
 
     public async resolveCommand() {
-        switch (this.command.length) {
-            case 0: {
-                const triggerId = this.context.getTriggerId() as string;
-                const user = this.context.getSender();
-
-                const modal = await promptModal({
-                    modify: this.modify,
-                    read: this.read,
-                    persistence: this.persistence,
-                    http: this.http,
-                    slashCommandContext: this.context,
-                    uiKitContext: undefined,
-                });
-
-                await this.modify
-                    .getUiController()
-                    .openModalView(modal, { triggerId }, user);
-            }
-            case 1: {
-                switch (this.command[0]) {
-                    case "authorize": {
-                        authorize(
-                            this.app,
-                            this.read,
-                            this.modify,
-                            this.sender,
-                            this.room,
-                            this.persistence
-                        );
-                    }
-                    case "help": {
-                        // TODO: Implement help command
-                    }
-                    default: {
-                        throw new Error("Invalid command");
-                    }
+        const commandLength = this.command.length;
+        if (commandLength === 1) {
+            switch (this.command[0]) {
+                case "authorize": {
+                    authorize(
+                        this.app,
+                        this.read,
+                        this.modify,
+                        this.sender,
+                        this.room,
+                        this.persistence
+                    );
+                }
+                case "help": {
+                    // TODO: Implement help command
+                }
+                default: {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        this.sender,
+                        this.room,
+                        "Invalid command"
+                    );
                 }
             }
+        } else {
+            const triggerId = this.context.getTriggerId() as string;
+            const user = this.context.getSender();
+
+            const modal = await promptModal({
+                modify: this.modify,
+                read: this.read,
+                persistence: this.persistence,
+                http: this.http,
+                slashCommandContext: this.context,
+                uiKitContext: undefined,
+            });
+
+            await this.modify
+                .getUiController()
+                .openModalView(modal, { triggerId }, user);
         }
     }
 }

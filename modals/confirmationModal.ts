@@ -7,12 +7,9 @@ import {
 import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashcommands";
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
 import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder";
-import {
-    getInteractionRoomData,
-    storeInteractionRoomData,
-} from "../lib/roomInteraction";
+import { ModalEnum } from "../constants/enums";
 
-export async function confirmationModal({
+export function confirmationModal({
     modify,
     read,
     persistence,
@@ -28,30 +25,7 @@ export async function confirmationModal({
     summary: string;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
-}): Promise<IUIKitModalViewParam> {
-    const room =
-        slashCommandContext?.getRoom() ||
-        uiKitContext?.getInteractionData().room;
-    const user =
-        slashCommandContext?.getSender() ||
-        uiKitContext?.getInteractionData().user;
-
-    if (user?.id) {
-        let roomId: string;
-
-        if (room?.id) {
-            roomId = room.id;
-            await storeInteractionRoomData(persistence, user.id, roomId);
-        } else {
-            roomId = (
-                await getInteractionRoomData(
-                    read.getPersistenceReader(),
-                    user.id
-                )
-            ).roomId;
-        }
-    }
-
+}): IUIKitModalViewParam {
     const blocks = modify.getCreator().getBlockBuilder();
     blocks.addSectionBlock({
         blockId: "confirmationBlockId",
@@ -61,24 +35,15 @@ export async function confirmationModal({
         ),
     });
 
-    blocks.addActionsBlock({
-        elements: [
-            blocks.newButtonElement({
-                actionId: "retry",
-                text: blocks.newPlainTextObject("Retry"),
-                value: "retry",
-            }),
-            blocks.newButtonElement({
-                actionId: "setMeeting",
-                text: blocks.newPlainTextObject("Set Meeting"),
-                value: "setMeeting",
-            }),
-        ],
-    });
-
     return {
-        id: "confirmationModalId",
+        id: ModalEnum.CONFIRMATION_MODAL,
         title: blocks.newPlainTextObject("Schedule your meeting"),
+        submit: blocks.newButtonElement({
+            text: blocks.newPlainTextObject("Schedule"),
+        }),
+        close: blocks.newButtonElement({
+            text: blocks.newPlainTextObject("Not satisfied? Retry here"),
+        }),
         blocks: blocks.getBlocks(),
     };
 }

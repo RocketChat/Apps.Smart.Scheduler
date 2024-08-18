@@ -7,15 +7,17 @@ import {
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
-import { SubmitEnum } from "../constants/enums";
+import { ModalEnum } from "../constants/enums";
 import {
     generateCommonTime,
     generateConstraintPrompt,
     getMeetingArguments,
 } from "../core/llms";
+import { confirmationModal } from "../modals/confirmationModal";
+// import { generateChatCompletions } from "../core/llms";
+import { storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
 import { getInteractionRoomData } from "../lib/roomInteraction";
-import { confirmationModal } from "../modals/confirmationModal";
 
 export class ExecuteViewSubmitHandler {
     constructor(
@@ -50,12 +52,17 @@ export class ExecuteViewSubmitHandler {
 
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
 
-        switch (view.submit?.actionId) {
-            case SubmitEnum.PROMPT_MODAL: {
-                const members = await this.read
-                    .getRoomReader()
-                    .getMembers(roomId);
-
+        switch (view.id) {
+            case ModalEnum.CONFIRMATION_MODAL: {
+                await sendNotification(
+                    this.read,
+                    this.modify,
+                    user,
+                    room,
+                    "> **Meeting scheduled**"
+                );
+            }
+            case ModalEnum.PROMPT_MODAL: {
                 try {
                     const prompt =
                         view.state?.["promptBlockId"]["promptBlockId"] || "";
@@ -64,28 +71,25 @@ export class ExecuteViewSubmitHandler {
                             "participantsBlockId"
                         ] || "";
 
-                    // TODO: Validate user input: prompt injection, 0 participants, etc.
-                    if (!prompt || !participants) {
-                        throw new Error("Input should not be empty");
-                    }
-
-                    const triggerId = context.getInteractionData().triggerId;
-                    const modal = await confirmationModal({
-                        modify: this.modify,
-                        read: this.read,
-                        persistence: this.persistence,
-                        http: this.http,
-                        uiKitContext: context,
-                        summary: `
-                        Participants: ${participants}
-                        `,
+                    await storeData(this.persistence, user.id, "prompt", {
+                        prompt,
+                    });
+                    await storeData(this.persistence, user.id, "participants", {
+                        participants,
                     });
 
-                    await this.modify
-                        .getUiController()
-                        .openModalView(modal, { triggerId }, user);
+                    // TODO: Validate user input: prompt injection, 0 participants, etc.
+                    // if (!prompt || !participants) {
+                    //     sendNotification(
+                    //         this.read,
+                    //         this.modify,
+                    //         user,
+                    //         room,
+                    //         "Input should not be empty"
+                    //     );
+                    // }
 
-                    const constraintPrompt = await generateConstraintPrompt(
+                    generateConstraintPrompt(
                         this.app,
                         this.http,
                         user,
@@ -94,50 +98,75 @@ export class ExecuteViewSubmitHandler {
                         this.read,
                         this.modify,
                         room
-                    );
+                    )
+                        .then((res) => {
+                            sendNotification(
+                                this.read,
+                                this.modify,
+                                user,
+                                room,
+                                `> Constraint prompt: ${res}`
+                            );
+                            return generateCommonTime(
+                                this.app,
+                                this.http,
+                                res
+                            ).then((res) => {
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `> Common time: ${res}`
+                                );
+                                return getMeetingArguments(
+                                    this.app,
+                                    this.http,
+                                    res,
+                                    user,
+                                    this.read,
+                                    this.modify,
+                                    room
+                                ).then((res) => {
+                                    const triggerId =
+                                        context.getInteractionData().triggerId;
+                                    const modal = confirmationModal({
+                                        modify: this.modify,
+                                        read: this.read,
+                                        persistence: this.persistence,
+                                        http: this.http,
+                                        uiKitContext: context,
+                                        summary: `
+                                        -----------
+                                        Participants: ${participants}
+                                        Args: ${JSON.stringify(res)}
+                                        -----------
+                                        `,
+                                    });
+                                    this.modify
+                                        .getUiController()
+                                        .openModalView(
+                                            modal,
+                                            { triggerId },
+                                            user
+                                        );
 
-                    const commonTime = await generateCommonTime(
-                        this.app,
-                        this.http,
-                        constraintPrompt
-                    );
+                                    return res;
+                                });
+                            });
+                        })
+                        .catch((e) => this.app.getLogger().error(e));
 
-                    const meetingArgs = await getMeetingArguments(
-                        this.app,
-                        this.http,
-                        commonTime
-                    );
-
-                    await sendNotification(
+                    sendNotification(
                         this.read,
                         this.modify,
                         user,
                         room,
-                        `Constraint prompt: ${constraintPrompt}
-                        -----------
-                        Common time: ${commonTime}
-                        -----------
-                        Meeting arguments: ${JSON.stringify(meetingArgs)}
-                        `
+                        `It may take a while. Please wait... :clock12:`
                     );
-
-                    return {
-                        success: true,
-                        roomId: roomId,
-                        members: members,
-                    };
+                    return context.getInteractionResponder().successResponse();
                 } catch (e) {
-                    await sendNotification(
-                        this.read,
-                        this.modify,
-                        user,
-                        room,
-                        `${e}`
-                    );
-                    return {
-                        success: false,
-                        error: e,
-                    };
+                    return context.getInteractionResponder().errorResponse();
                 }
             }
         }

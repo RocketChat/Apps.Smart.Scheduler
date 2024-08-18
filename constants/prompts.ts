@@ -76,7 +76,5 @@ You are a scheduling assistant who will help a group of people to find suitable 
 
 Based on this prompt:
 {prompt}
-
 What is their common free time? 
-
 `;

@@ -8,7 +8,7 @@ import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashco
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
 import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder";
 import { TextObjectType } from "@rocket.chat/apps-engine/definition/uikit/blocks";
-import { SubmitEnum } from "../constants/enums";
+import { ModalEnum } from "../constants/enums";
 import { IParticipantProps } from "../definitions/IParticipantProps";
 import {
     getInteractionRoomData,
@@ -122,10 +122,9 @@ export async function promptModal({
     });
 
     return {
-        id: "promptModalId",
+        id: ModalEnum.PROMPT_MODAL,
         title: blocks.newPlainTextObject("Schedule your meeting"),
         submit: blocks.newButtonElement({
-            actionId: SubmitEnum.PROMPT_MODAL,
             text: blocks.newPlainTextObject("Schedule"),
         }),
         blocks: blocks.getBlocks(),
