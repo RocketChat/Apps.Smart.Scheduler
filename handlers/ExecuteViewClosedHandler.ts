@@ -8,9 +8,9 @@ import { IApp } from "@rocket.chat/apps-engine/definition/IApp";
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewCloseInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { ModalEnum } from "../constants/enums";
+import { PARTICIPANT_KEY, PROMPT_KEY, ROOM_ID_KEY } from "../constants/keys";
 import { getData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
-import { getInteractionRoomData } from "../lib/roomInteraction";
 
 export class ExecuteViewClosedHandler {
     constructor(
@@ -25,9 +25,10 @@ export class ExecuteViewClosedHandler {
         const { view } = context.getInteractionData();
         const { user } = context.getInteractionData();
 
-        const { roomId } = await getInteractionRoomData(
+        const { roomId } = await getData(
             this.read.getPersistenceReader(),
-            user.id
+            user.id,
+            ROOM_ID_KEY
         );
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
 
@@ -36,12 +37,12 @@ export class ExecuteViewClosedHandler {
                 const { prompt } = await getData(
                     this.read.getPersistenceReader(),
                     user.id,
-                    "prompt"
+                    PROMPT_KEY
                 );
                 const { participants } = await getData(
                     this.read.getPersistenceReader(),
                     user.id,
-                    "participants"
+                    PARTICIPANT_KEY
                 );
 
                 await sendNotification(

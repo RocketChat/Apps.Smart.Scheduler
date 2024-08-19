@@ -15,9 +15,9 @@ import {
 } from "../core/llms";
 import { confirmationModal } from "../modals/confirmationModal";
 // import { generateChatCompletions } from "../core/llms";
-import { storeData } from "../lib/dataStore";
+import { PARTICIPANT_KEY, PROMPT_KEY, ROOM_ID_KEY } from "../constants/keys";
+import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
-import { getInteractionRoomData } from "../lib/roomInteraction";
 
 export class ExecuteViewSubmitHandler {
     constructor(
@@ -38,9 +38,10 @@ export class ExecuteViewSubmitHandler {
             };
         }
 
-        const { roomId } = await getInteractionRoomData(
+        const { roomId } = await getData(
             this.read.getPersistenceReader(),
-            user.id
+            user.id,
+            ROOM_ID_KEY
         );
 
         if (!roomId) {
@@ -71,12 +72,17 @@ export class ExecuteViewSubmitHandler {
                             "participantsBlockId"
                         ] || "";
 
-                    await storeData(this.persistence, user.id, "prompt", {
+                    await storeData(this.persistence, user.id, PROMPT_KEY, {
                         prompt,
                     });
-                    await storeData(this.persistence, user.id, "participants", {
-                        participants,
-                    });
+                    await storeData(
+                        this.persistence,
+                        user.id,
+                        PARTICIPANT_KEY,
+                        {
+                            participants,
+                        }
+                    );
 
                     // TODO: Validate user input: prompt injection, 0 participants, etc.
                     // if (!prompt || !participants) {

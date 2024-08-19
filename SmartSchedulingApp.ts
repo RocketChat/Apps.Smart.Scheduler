@@ -24,15 +24,13 @@ import {
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { OAuth2Client } from "@rocket.chat/apps-engine/server/oauth2/OAuth2Client";
 import { ScheduleCommand } from "./commands/ScheduleCommand";
+import { ROOM_ID_KEY } from "./constants/keys";
 import { settings } from "./constants/settings";
 import { ExecuteBlockActionHandler } from "./handlers/ExecuteBlockActionHandler";
 import { ExecuteViewClosedHandler } from "./handlers/ExecuteViewClosedHandler";
 import { ExecuteViewSubmitHandler } from "./handlers/ExecuteViewSubmitHandler";
+import { clearData, getData } from "./lib/dataStore";
 import { sendNotification } from "./lib/messages";
-import {
-    clearInteractionRoomData,
-    getInteractionRoomData,
-} from "./lib/roomInteraction";
 
 export class SmartSchedulingApp extends App {
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
@@ -113,9 +111,10 @@ export class SmartSchedulingApp extends App {
         persistence: IPersistence
     ) {
         let text = `Authentication Succesfull 🚀`;
-        let interactionData = await getInteractionRoomData(
+        let interactionData = await getData(
             read.getPersistenceReader(),
-            user.id
+            user.id,
+            ROOM_ID_KEY
         );
 
         if (token) {
@@ -126,7 +125,7 @@ export class SmartSchedulingApp extends App {
         if (interactionData && interactionData.roomId) {
             let roomId = interactionData.roomId as string;
             let room = (await read.getRoomReader().getById(roomId)) as IRoom;
-            await clearInteractionRoomData(persistence, user.id);
+            await clearData(persistence, user.id, ROOM_ID_KEY);
             await sendNotification(read, modify, user, room, text);
         }
     }

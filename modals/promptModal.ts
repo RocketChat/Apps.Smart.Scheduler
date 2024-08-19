@@ -9,11 +9,9 @@ import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uik
 import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder";
 import { TextObjectType } from "@rocket.chat/apps-engine/definition/uikit/blocks";
 import { ModalEnum } from "../constants/enums";
+import { ROOM_ID_KEY } from "../constants/keys";
 import { IParticipantProps } from "../definitions/IParticipantProps";
-import {
-    getInteractionRoomData,
-    storeInteractionRoomData,
-} from "../lib/roomInteraction";
+import { getData, storeData } from "../lib/dataStore";
 
 export async function promptModal({
     modify,
@@ -43,13 +41,10 @@ export async function promptModal({
 
         if (room?.id) {
             roomId = room.id;
-            await storeInteractionRoomData(persistence, user.id, roomId);
+            await storeData(persistence, user.id, ROOM_ID_KEY, { roomId });
         } else {
             roomId = (
-                await getInteractionRoomData(
-                    read.getPersistenceReader(),
-                    user.id
-                )
+                await getData(read.getPersistenceReader(), user.id, ROOM_ID_KEY)
             ).roomId;
         }
 
