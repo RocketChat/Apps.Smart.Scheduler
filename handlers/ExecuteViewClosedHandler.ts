@@ -4,17 +4,29 @@ import {
     IPersistence,
     IRead,
 } from "@rocket.chat/apps-engine/definition/accessors";
-import { IApp } from "@rocket.chat/apps-engine/definition/IApp";
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewCloseInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
 import { ModalEnum } from "../constants/enums";
-import { PARTICIPANT_KEY, PROMPT_KEY, ROOM_ID_KEY } from "../constants/keys";
-import { getData } from "../lib/dataStore";
+import {
+    PARTICIPANT_KEY,
+    PROMPT_KEY,
+    RETRY_COUNT_KEY,
+    ROOM_ID_KEY,
+    TRIGGER_ID_KEY,
+} from "../constants/keys";
+import {
+    generateCommonTime,
+    generateConstraintPrompt,
+    getMeetingArguments,
+} from "../core/llms";
+import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
+import { confirmationModal } from "../modals/confirmationModal";
+import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
 export class ExecuteViewClosedHandler {
     constructor(
-        private readonly app: IApp,
+        private readonly app: SmartSchedulingApp,
         private readonly read: IRead,
         private readonly http: IHttp,
         private readonly modify: IModify,
@@ -25,37 +37,140 @@ export class ExecuteViewClosedHandler {
         const { view } = context.getInteractionData();
         const { user } = context.getInteractionData();
 
-        const { roomId } = await getData(
-            this.read.getPersistenceReader(),
-            user.id,
-            ROOM_ID_KEY
-        );
+        const readPersistence = this.read.getPersistenceReader();
+        const { roomId } = await getData(readPersistence, user.id, ROOM_ID_KEY);
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
 
         switch (view.id) {
             case ModalEnum.CONFIRMATION_MODAL: {
                 const { prompt } = await getData(
-                    this.read.getPersistenceReader(),
+                    readPersistence,
                     user.id,
                     PROMPT_KEY
                 );
                 const { participants } = await getData(
-                    this.read.getPersistenceReader(),
+                    readPersistence,
                     user.id,
                     PARTICIPANT_KEY
                 );
-
-                await sendNotification(
-                    this.read,
-                    this.modify,
-                    user,
-                    room,
-                    `=============
-                    Testing retry args...
-                    Prompt: ${prompt}
-                    Participants: ${participants}
-                    =============`
+                const { triggerId } = await getData(
+                    readPersistence,
+                    user.id,
+                    TRIGGER_ID_KEY
                 );
+                const { count } = await getData(
+                    readPersistence,
+                    user.id,
+                    RETRY_COUNT_KEY
+                );
+
+                await storeData(this.persistence, user.id, RETRY_COUNT_KEY, {
+                    count: count + 1,
+                });
+
+                try {
+                    // TODO: Validate user input: prompt injection, 0 participants, etc.
+                    // if (!prompt || !participants) {
+                    //     sendNotification(
+                    //         this.read,
+                    //         this.modify,
+                    //         user,
+                    //         room,
+                    //         "Input should not be empty"
+                    //     );
+                    // }
+
+                    generateConstraintPrompt(
+                        this.app,
+                        this.http,
+                        user,
+                        participants,
+                        prompt,
+                        this.read,
+                        this.modify,
+                        room
+                    )
+                        .then((res) => {
+                            sendNotification(
+                                this.read,
+                                this.modify,
+                                user,
+                                room,
+                                `> Constraint prompt: ${res}`
+                            );
+                            if (count >= 2) {
+                                // TODO: use algorithm
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    "Retry limit exceeded."
+                                );
+                                return;
+                            }
+
+                            return generateCommonTime(
+                                this.app,
+                                this.http,
+                                res
+                            ).then((res) => {
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `> Common time: ${res}`
+                                );
+                                return getMeetingArguments(
+                                    this.app,
+                                    this.http,
+                                    res,
+                                    user,
+                                    this.read,
+                                    this.modify,
+                                    room
+                                ).then((res) => {
+                                    const modal = confirmationModal({
+                                        modify: this.modify,
+                                        read: this.read,
+                                        persistence: this.persistence,
+                                        http: this.http,
+                                        uiKitContext: context,
+                                        summary: `
+                                        -----------
+                                        Participants: ${participants}
+                                        Time: 
+                                        - Start ${res.datetimeStart}
+                                        - End ${res.datetimeEnd}
+                                        -----------
+                                        `,
+                                    });
+                                    this.modify
+                                        .getUiController()
+                                        .openModalView(
+                                            modal,
+                                            { triggerId },
+                                            user
+                                        );
+
+                                    return res;
+                                });
+                            });
+                        })
+                        .catch((e) => this.app.getLogger().error(e));
+
+                    sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        `Retry count: ${count}. Please wait... :clock12:`
+                    );
+                    return context.getInteractionResponder().successResponse();
+                } catch (e) {
+                    return context.getInteractionResponder().errorResponse();
+                }
             }
         }
         return { success: true } as any;

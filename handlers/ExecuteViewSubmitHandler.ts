@@ -15,7 +15,13 @@ import {
 } from "../core/llms";
 import { confirmationModal } from "../modals/confirmationModal";
 // import { generateChatCompletions } from "../core/llms";
-import { PARTICIPANT_KEY, PROMPT_KEY, ROOM_ID_KEY } from "../constants/keys";
+import {
+    PARTICIPANT_KEY,
+    PROMPT_KEY,
+    RETRY_COUNT_KEY,
+    ROOM_ID_KEY,
+    TRIGGER_ID_KEY,
+} from "../constants/keys";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
 
@@ -72,16 +78,28 @@ export class ExecuteViewSubmitHandler {
                             "participantsBlockId"
                         ] || "";
 
+                    const triggerId = context.getInteractionData().triggerId;
+
                     await storeData(this.persistence, user.id, PROMPT_KEY, {
                         prompt,
                     });
+
                     await storeData(
                         this.persistence,
                         user.id,
                         PARTICIPANT_KEY,
-                        {
-                            participants,
-                        }
+                        { participants }
+                    );
+
+                    await storeData(this.persistence, user.id, TRIGGER_ID_KEY, {
+                        triggerId,
+                    });
+
+                    await storeData(
+                        this.persistence,
+                        user.id,
+                        RETRY_COUNT_KEY,
+                        { count: 1 }
                     );
 
                     // TODO: Validate user input: prompt injection, 0 participants, etc.
@@ -134,8 +152,6 @@ export class ExecuteViewSubmitHandler {
                                     this.modify,
                                     room
                                 ).then((res) => {
-                                    const triggerId =
-                                        context.getInteractionData().triggerId;
                                     const modal = confirmationModal({
                                         modify: this.modify,
                                         read: this.read,
