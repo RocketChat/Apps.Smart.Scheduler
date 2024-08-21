@@ -20,7 +20,6 @@ import {
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
-    TRIGGER_ID_KEY,
 } from "../constants/keys";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
@@ -78,8 +77,6 @@ export class ExecuteViewSubmitHandler {
                             "participantsBlockId"
                         ] || "";
 
-                    const triggerId = context.getInteractionData().triggerId;
-
                     await storeData(this.persistence, user.id, PROMPT_KEY, {
                         prompt,
                     });
@@ -90,10 +87,6 @@ export class ExecuteViewSubmitHandler {
                         PARTICIPANT_KEY,
                         { participants }
                     );
-
-                    await storeData(this.persistence, user.id, TRIGGER_ID_KEY, {
-                        triggerId,
-                    });
 
                     await storeData(
                         this.persistence,
@@ -152,26 +145,27 @@ export class ExecuteViewSubmitHandler {
                                     this.modify,
                                     room
                                 ).then((res) => {
-                                    const modal = confirmationModal({
+                                    const blocks = confirmationModal({
                                         modify: this.modify,
                                         read: this.read,
                                         persistence: this.persistence,
                                         http: this.http,
                                         uiKitContext: context,
-                                        summary: `
-                                        -----------
-                                        Participants: ${participants}
-                                        Args: ${JSON.stringify(res)}
-                                        -----------
+                                        summary: `Participants: ${participants}
+                                        Args: 
+                                        - Start time: ${res.datetimeStart}
+                                        - End time: ${res.datetimeEnd}
                                         `,
                                     });
-                                    this.modify
-                                        .getUiController()
-                                        .openModalView(
-                                            modal,
-                                            { triggerId },
-                                            user
-                                        );
+
+                                    sendNotification(
+                                        this.read,
+                                        this.modify,
+                                        user,
+                                        room,
+                                        `Schedule your meeting`,
+                                        blocks
+                                    );
 
                                     return res;
                                 });
@@ -179,13 +173,14 @@ export class ExecuteViewSubmitHandler {
                         })
                         .catch((e) => this.app.getLogger().error(e));
 
-                    sendNotification(
+                    await sendNotification(
                         this.read,
                         this.modify,
                         user,
                         room,
-                        `It may take a while. Please wait... :clock12:`
+                        `AI is thinking, it may take a while. Please wait... :clock12:`
                     );
+
                     return context.getInteractionResponder().successResponse();
                 } catch (e) {
                     return context.getInteractionResponder().errorResponse();

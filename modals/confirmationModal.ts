@@ -5,9 +5,11 @@ import {
     IRead,
 } from "@rocket.chat/apps-engine/definition/accessors";
 import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashcommands";
+import {
+    BlockBuilder,
+    ButtonStyle,
+} from "@rocket.chat/apps-engine/definition/uikit";
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
-import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder";
-import { ModalEnum } from "../constants/enums";
 
 export function confirmationModal({
     modify,
@@ -25,7 +27,7 @@ export function confirmationModal({
     summary: string;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
-}): IUIKitModalViewParam {
+}): BlockBuilder {
     const blocks = modify.getCreator().getBlockBuilder();
     blocks.addSectionBlock({
         blockId: "confirmationBlockId",
@@ -35,15 +37,20 @@ export function confirmationModal({
         ),
     });
 
-    return {
-        id: ModalEnum.CONFIRMATION_MODAL,
-        title: blocks.newPlainTextObject("Schedule your meeting"),
-        submit: blocks.newButtonElement({
-            text: blocks.newPlainTextObject("Schedule"),
-        }),
-        close: blocks.newButtonElement({
-            text: blocks.newPlainTextObject("Not satisfied? Retry here"),
-        }),
-        blocks: blocks.getBlocks(),
-    };
+    blocks.addActionsBlock({
+        blockId: "confirmationActionsBlockId",
+        elements: [
+            blocks.newButtonElement({
+                actionId: "Retry",
+                text: blocks.newPlainTextObject("Not satisfied? Retry here"),
+            }),
+            blocks.newButtonElement({
+                actionId: "Schedule",
+                text: blocks.newPlainTextObject("Schedule"),
+                style: ButtonStyle.PRIMARY,
+            }),
+        ],
+    });
+
+    return blocks;
 }
