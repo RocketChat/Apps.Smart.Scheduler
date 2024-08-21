@@ -12,7 +12,6 @@ import { IExecutorProps } from "../definitions/IExecutorProps";
 
 import { authorize } from "../modals/authModal";
 import { promptModal } from "../modals/promptModal";
-import { sendNotification } from "./messages";
 
 export class CommandUtility {
     sender: IUser;
@@ -53,15 +52,6 @@ export class CommandUtility {
                 }
                 case "help": {
                     // TODO: Implement help command
-                }
-                default: {
-                    await sendNotification(
-                        this.read,
-                        this.modify,
-                        this.sender,
-                        this.room,
-                        "Invalid command"
-                    );
                 }
             }
         } else {

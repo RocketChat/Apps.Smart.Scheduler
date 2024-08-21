@@ -90,7 +90,7 @@ export async function generateCommonTime(
     http: IHttp,
     constraintPrompt: string
 ): Promise<string> {
-    return `02:30:00Z to 03:00:00Z`;
+    return `2024-09-02T02:30:00Z to 2024-09-02T03:00:00Z`;
     const body = {
         messages: [
             {
