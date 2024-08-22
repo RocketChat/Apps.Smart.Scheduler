@@ -14,7 +14,6 @@ import {
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
-    TRIGGER_ID_KEY,
 } from "../constants/keys";
 import {
     generateCommonTime,
@@ -53,7 +52,36 @@ export class ExecuteBlockActionHandler {
         }
 
         switch (actionId) {
+            case "Schedule": {
+                await sendNotification(
+                    this.read,
+                    this.modify,
+                    user,
+                    room,
+                    "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
+                );
+
+                return context.getInteractionResponder().successResponse();
+            }
             case "Retry": {
+                const { count } = await getData(
+                    readPersistence,
+                    user.id,
+                    RETRY_COUNT_KEY
+                );
+
+                if (count >= 3) {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        "You have reached the maximum number of retries. Trigger `/schedule` to start over."
+                    );
+
+                    return context.getInteractionResponder().successResponse();
+                }
+
                 const { prompt } = await getData(
                     readPersistence,
                     user.id,
@@ -63,16 +91,6 @@ export class ExecuteBlockActionHandler {
                     readPersistence,
                     user.id,
                     PARTICIPANT_KEY
-                );
-                const { triggerId } = await getData(
-                    readPersistence,
-                    user.id,
-                    TRIGGER_ID_KEY
-                );
-                const { count } = await getData(
-                    readPersistence,
-                    user.id,
-                    RETRY_COUNT_KEY
                 );
 
                 await storeData(this.persistence, user.id, RETRY_COUNT_KEY, {
@@ -109,17 +127,6 @@ export class ExecuteBlockActionHandler {
                                 room,
                                 `> Constraint prompt: ${res}`
                             );
-                            if (count >= 2) {
-                                // TODO: use algorithm
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    "Retry limit exceeded."
-                                );
-                                return;
-                            }
 
                             return generateCommonTime(
                                 this.app,

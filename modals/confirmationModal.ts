@@ -8,6 +8,7 @@ import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashco
 import {
     BlockBuilder,
     ButtonStyle,
+    IButtonElement,
 } from "@rocket.chat/apps-engine/definition/uikit";
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
 
@@ -19,6 +20,7 @@ export function confirmationModal({
     summary,
     slashCommandContext,
     uiKitContext,
+    useRetry = true,
 }: {
     modify: IModify;
     read: IRead;
@@ -27,6 +29,7 @@ export function confirmationModal({
     summary: string;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
+    useRetry?: boolean;
 }): BlockBuilder {
     const blocks = modify.getCreator().getBlockBuilder();
     blocks.addSectionBlock({
@@ -37,19 +40,28 @@ export function confirmationModal({
         ),
     });
 
+    let createdElements: IButtonElement[] = [];
+
+    if (useRetry) {
+        createdElements.push(
+            blocks.newButtonElement({
+                text: blocks.newPlainTextObject("Retry"),
+                actionId: "Retry",
+            })
+        );
+    }
+
+    createdElements.push(
+        blocks.newButtonElement({
+            actionId: "Schedule",
+            text: blocks.newPlainTextObject("Schedule"),
+            style: ButtonStyle.PRIMARY,
+        })
+    );
+
     blocks.addActionsBlock({
         blockId: "confirmationActionsBlockId",
-        elements: [
-            blocks.newButtonElement({
-                actionId: "Retry",
-                text: blocks.newPlainTextObject("Not satisfied? Retry here"),
-            }),
-            blocks.newButtonElement({
-                actionId: "Schedule",
-                text: blocks.newPlainTextObject("Schedule"),
-                style: ButtonStyle.PRIMARY,
-            }),
-        ],
+        elements: createdElements,
     });
 
     return blocks;
