@@ -99,15 +99,15 @@ export class ExecuteBlockActionHandler {
 
                 try {
                     // TODO: Validate user input: prompt injection, 0 participants, etc.
-                    // if (!prompt || !participants) {
-                    //     sendNotification(
-                    //         this.read,
-                    //         this.modify,
-                    //         user,
-                    //         room,
-                    //         "Input should not be empty"
-                    //     );
-                    // }
+                    if (!prompt || !participants) {
+                        sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Input should not be empty"
+                        );
+                    }
 
                     generateConstraintPrompt(
                         this.app,
@@ -115,6 +115,7 @@ export class ExecuteBlockActionHandler {
                         user,
                         participants,
                         prompt,
+                        this.persistence,
                         this.read,
                         this.modify,
                         room

@@ -11,16 +11,19 @@ import { ModalEnum } from "../constants/enums";
 import {
     generateCommonTime,
     generateConstraintPrompt,
+    generateConstraintPromptHelper,
     getMeetingArguments,
 } from "../core/llms";
 import { confirmationModal } from "../modals/confirmationModal";
 // import { generateChatCompletions } from "../core/llms";
 import {
     PARTICIPANT_KEY,
+    PREFFERED_ARGS_KEY,
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
 } from "../constants/keys";
+import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
 
@@ -57,19 +60,29 @@ export class ExecuteViewSubmitHandler {
         }
 
         let room = (await this.read.getRoomReader().getById(roomId)) as IRoom;
+        const readPersistence = this.read.getPersistenceReader();
 
-        switch (view.id) {
-            case ModalEnum.CONFIRMATION_MODAL: {
-                await sendNotification(
-                    this.read,
-                    this.modify,
-                    user,
-                    room,
-                    "> **Meeting scheduled**"
-                );
-            }
-            case ModalEnum.PROMPT_MODAL: {
-                try {
+        try {
+            switch (view.id) {
+                case ModalEnum.CONFIRMATION_MODAL: {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        "> **Meeting scheduled**"
+                    );
+                    break;
+                }
+                case ModalEnum.PROMPT_MODAL: {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        `AI is thinking, it may take a while. Please wait... :clock12:`
+                    );
+
                     const prompt =
                         view.state?.["promptBlockId"]["promptBlockId"] || "";
                     const participants =
@@ -96,15 +109,15 @@ export class ExecuteViewSubmitHandler {
                     );
 
                     // TODO: Validate user input: prompt injection, 0 participants, etc.
-                    // if (!prompt || !participants) {
-                    //     sendNotification(
-                    //         this.read,
-                    //         this.modify,
-                    //         user,
-                    //         room,
-                    //         "Input should not be empty"
-                    //     );
-                    // }
+                    if (!prompt || !participants) {
+                        sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Input should not be empty"
+                        );
+                    }
 
                     generateConstraintPrompt(
                         this.app,
@@ -112,93 +125,219 @@ export class ExecuteViewSubmitHandler {
                         user,
                         participants,
                         prompt,
+                        this.persistence,
                         this.read,
                         this.modify,
                         room
                     )
-                        .then((res) => {
-                            sendNotification(
-                                this.read,
-                                this.modify,
-                                user,
-                                room,
-                                `> Constraint prompt: ${res}`
-                            );
-                            return generateCommonTime(
-                                this.app,
-                                this.http,
-                                res
-                            ).then((res) => {
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    `> Common time: ${res}`
-                                );
-                                return getMeetingArguments(
-                                    this.app,
-                                    this.http,
-                                    res,
-                                    user,
-                                    this.read,
-                                    this.modify,
-                                    room
-                                ).then((res) => {
-                                    const blocks = confirmationModal({
-                                        modify: this.modify,
-                                        read: this.read,
-                                        persistence: this.persistence,
-                                        http: this.http,
-                                        uiKitContext: context,
-                                        summary: `Participants: ${participants}
-                                        Args: 
-                                        - Start time: ${res.datetimeStart}
-                                        - End time: ${res.datetimeEnd}
-                                        `,
-                                    });
-
-                                    sendNotification(
+                        .then((res) =>
+                            generateCommonTime(this.app, this.http, res).then(
+                                (res) => {
+                                    return getMeetingArguments(
+                                        this.app,
+                                        this.http,
+                                        res,
+                                        user,
                                         this.read,
                                         this.modify,
-                                        user,
-                                        room,
-                                        `Schedule your meeting`,
-                                        blocks
-                                    );
+                                        room
+                                    ).then((res) => {
+                                        const blocks = confirmationModal({
+                                            modify: this.modify,
+                                            read: this.read,
+                                            persistence: this.persistence,
+                                            http: this.http,
+                                            uiKitContext: context,
+                                            useRetry: false,
+                                            summary: `Participants: ${participants}
+                                            Args: 
+                                            - Start time: ${res.datetimeStart}
+                                            - End time: ${res.datetimeEnd}
+                                        `,
+                                        });
 
-                                    return res;
-                                });
-                            });
-                        })
+                                        sendNotification(
+                                            this.read,
+                                            this.modify,
+                                            user,
+                                            room,
+                                            "Schedule your meeting. Use `/schedule retry` if you are not satisfied.",
+                                            blocks
+                                        );
+
+                                        return res;
+                                    });
+                                }
+                            )
+                        )
                         .catch((e) => this.app.getLogger().error(e));
 
+                    break;
+                }
+                case ModalEnum.RETRY_MODAL: {
                     await sendNotification(
                         this.read,
                         this.modify,
                         user,
                         room,
-                        `AI is thinking, it may take a while. Please wait... :clock12:`
+                        `Retrying...`
                     );
 
-                    return context.getInteractionResponder().successResponse();
-                } catch (e) {
-                    return context.getInteractionResponder().errorResponse();
+                    const { prompt } = await getData(
+                        readPersistence,
+                        user.id,
+                        PROMPT_KEY
+                    );
+
+                    if (!prompt) {
+                        await sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            `Trigger \`\\schedule\` first`
+                        );
+
+                        return {
+                            success: false,
+                            error: "No prompt found",
+                        };
+                    }
+
+                    const { participants } = await getData(
+                        readPersistence,
+                        user.id,
+                        PARTICIPANT_KEY
+                    );
+
+                    const { count } = await getData(
+                        readPersistence,
+                        user.id,
+                        RETRY_COUNT_KEY
+                    );
+
+                    await storeData(
+                        this.persistence,
+                        user.id,
+                        RETRY_COUNT_KEY,
+                        { count: count + 1 }
+                    );
+
+                    const args = await getData(
+                        readPersistence,
+                        user.id,
+                        PREFFERED_ARGS_KEY
+                    );
+
+                    const newArgs: IConstraintArgs = {
+                        preferredDate:
+                            view.state?.["preferenceDateBlockId"][
+                                "preferenceDateBlockId"
+                            ] || args.preferredDate,
+                        timeMin:
+                            view.state?.["preferenceTimeMinBlockId"][
+                                "preferenceTimeMinBlockId"
+                            ] || args.timeMin,
+                        timeMax:
+                            view.state?.["preferenceTimeMaxBlockId"][
+                                "preferenceTimeMaxBlockId"
+                            ] || args.timeMax,
+                    };
+
+                    await storeData(
+                        this.persistence,
+                        user.id,
+                        PREFFERED_ARGS_KEY,
+                        newArgs
+                    );
+
+                    const algorithm =
+                        view.state?.["algorithmBlockId"]["algorithmBlockId"] ||
+                        "llm";
+
+                    switch (algorithm) {
+                        case "llm": {
+                            generateConstraintPromptHelper(
+                                this.app,
+                                this.http,
+                                user,
+                                participants,
+                                newArgs
+                            )
+                                .then((res) => {
+                                    generateCommonTime(
+                                        this.app,
+                                        this.http,
+                                        res
+                                    ).then((res) => {
+                                        return getMeetingArguments(
+                                            this.app,
+                                            this.http,
+                                            res,
+                                            user,
+                                            this.read,
+                                            this.modify,
+                                            room
+                                        ).then((res) => {
+                                            const blocks = confirmationModal({
+                                                modify: this.modify,
+                                                read: this.read,
+                                                persistence: this.persistence,
+                                                http: this.http,
+                                                uiKitContext: context,
+                                                useRetry: false,
+                                                summary: `Participants: ${participants}
+                                                Args: 
+                                                - Start time: ${res.datetimeStart}
+                                                - End time: ${res.datetimeEnd}
+                                                `,
+                                            });
+
+                                            sendNotification(
+                                                this.read,
+                                                this.modify,
+                                                user,
+                                                room,
+                                                "Schedule your meeting",
+                                                blocks
+                                            );
+
+                                            return res;
+                                        });
+                                    });
+                                })
+                                .catch((e) => this.app.getLogger().error(e));
+
+                            break;
+                        }
+                        case "algorithm": {
+                            // TODO
+                            await sendNotification(
+                                this.read,
+                                this.modify,
+                                user,
+                                room,
+                                "Algorithm is not implemented yet"
+                            );
+
+                            break;
+                        }
+                    }
+
+                    break;
                 }
             }
-        }
 
-        await sendNotification(
-            this.read,
-            this.modify,
-            user,
-            room,
-            "Invalid view id"
-        );
-        return {
-            success: false,
-            error: "Invalid view id",
-            ...view,
-        };
+            return context.getInteractionResponder().successResponse();
+        } catch (e) {
+            await sendNotification(
+                this.read,
+                this.modify,
+                user,
+                room,
+                `Error occurred: ${e}`
+            );
+            return context.getInteractionResponder().errorResponse();
+        }
     }
 }

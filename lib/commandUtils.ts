@@ -10,8 +10,12 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { IExecutorProps } from "../definitions/IExecutorProps";
 
+import { PREFFERED_ARGS_KEY } from "../constants/keys";
 import { authorize } from "../modals/authModal";
 import { promptModal } from "../modals/promptModal";
+import { retryModal } from "../modals/retryModal";
+import { getData } from "./dataStore";
+import { sendNotification } from "./messages";
 
 export class CommandUtility {
     sender: IUser;
@@ -39,20 +43,48 @@ export class CommandUtility {
     public async resolveCommand() {
         const commandLength = this.command.length;
         if (commandLength === 1) {
-            switch (this.command[0]) {
-                case "authorize": {
-                    authorize(
-                        this.app,
-                        this.read,
-                        this.modify,
-                        this.sender,
-                        this.room,
-                        this.persistence
-                    );
-                }
-                case "help": {
-                    // TODO: Implement help command
-                }
+            const command = this.command[0];
+            if (command === "authorize") {
+                authorize(
+                    this.app,
+                    this.read,
+                    this.modify,
+                    this.sender,
+                    this.room,
+                    this.persistence
+                );
+            } else if (command === "retry") {
+                const triggerId = this.context.getTriggerId() as string;
+                const user = this.context.getSender();
+                const args = await getData(
+                    this.read.getPersistenceReader(),
+                    user.id,
+                    PREFFERED_ARGS_KEY
+                );
+
+                const modal = await retryModal({
+                    modify: this.modify,
+                    read: this.read,
+                    persistence: this.persistence,
+                    http: this.http,
+                    preferenceArgs: args,
+                    slashCommandContext: this.context,
+                    uiKitContext: undefined,
+                });
+
+                await this.modify
+                    .getUiController()
+                    .openModalView(modal, { triggerId }, user);
+            } else if (command === "help") {
+                // TODO: Implement help command
+            } else {
+                await sendNotification(
+                    this.read,
+                    this.modify,
+                    this.sender,
+                    this.room,
+                    `Command: '${this.command[0]}' not found.`
+                );
             }
         } else {
             const triggerId = this.context.getTriggerId() as string;

@@ -1,5 +1,9 @@
-import { IHttp } from "@rocket.chat/apps-engine/definition/accessors";
+import {
+    IHttp,
+    IPersistence,
+} from "@rocket.chat/apps-engine/definition/accessors";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
+import { PREFFERED_ARGS_KEY } from "../constants/keys";
 import {
     constructConstraintPrompt,
     constructPreferredDateTimePrompt,
@@ -7,6 +11,7 @@ import {
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
+import { storeData } from "../lib/dataStore";
 import { timeToUTC } from "../lib/dateUtils";
 import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
@@ -180,6 +185,7 @@ export async function generateConstraintPrompt(
     user: IUser,
     emails: string[],
     prompt: string,
+    persistence: IPersistence,
     // DEBUG
     read: any,
     modify: any,
@@ -206,6 +212,8 @@ export async function generateConstraintPrompt(
 
     const args = await getConstraintArguments(app, http, preferredDateTime);
 
+    await storeData(persistence, user.id, PREFFERED_ARGS_KEY, args);
+
     // DEBUG
     await sendNotification(
         read,
@@ -215,6 +223,35 @@ export async function generateConstraintPrompt(
         `Args: ${JSON.stringify(args)} \n`
     );
 
+    const constraintPrompt = await generateConstraintPromptHelper(
+        app,
+        http,
+        user,
+        emails,
+        args
+    );
+
+    // DEBUG
+    await sendNotification(
+        read,
+        modify,
+        user,
+        room,
+        `Constraints: 
+        ${constraintPrompt}
+        -----------`
+    );
+
+    return constraintPrompt;
+}
+
+export async function generateConstraintPromptHelper(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    user: IUser,
+    emails: string[],
+    args: IConstraintArgs
+): Promise<string> {
     const constraints = (await getConstraints(
         app,
         http,
@@ -230,16 +267,6 @@ export async function generateConstraintPrompt(
         timeMin,
         timeMax,
         constraints
-    );
-
-    // DEBUG
-    await sendNotification(
-        read,
-        modify,
-        user,
-        room,
-        `Constraints: ${JSON.stringify(constraints)}
-        -----------`
     );
 
     return constraintPrompt;

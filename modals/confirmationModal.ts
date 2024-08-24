@@ -36,7 +36,9 @@ export function confirmationModal({
         blockId: "confirmationBlockId",
         text: blocks.newMarkdownTextObject(
             `*Please confirm the following details:*
-            ${summary}`
+            ${summary} 
+            Use \`/schedule retry\` if you are not satisfied.
+            `
         ),
     });
 
