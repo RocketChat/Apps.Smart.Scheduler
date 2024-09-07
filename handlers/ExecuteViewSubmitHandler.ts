@@ -12,6 +12,7 @@ import {
     generateCommonTime,
     generateConstraintPrompt,
     generateConstraintPromptHelper,
+    generatePromptForAlgorithm,
     getMeetingArguments,
 } from "../core/llms";
 import { confirmationModal } from "../modals/confirmationModal";
@@ -22,7 +23,9 @@ import {
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
+    SCHEDULE_ARGS_KEY,
 } from "../constants/keys";
+import { CommonTimeExtractor } from "../core/algorithm";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
@@ -311,14 +314,66 @@ export class ExecuteViewSubmitHandler {
                             break;
                         }
                         case "algorithm": {
-                            // TODO
                             await sendNotification(
                                 this.read,
                                 this.modify,
                                 user,
                                 room,
-                                "Algorithm is not implemented yet"
+                                "Algorithm is running..."
                             );
+
+                            generatePromptForAlgorithm(
+                                this.app,
+                                this.http,
+                                user,
+                                participants,
+                                newArgs
+                            ).then((res) => {
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `> ${res}`
+                                );
+
+                                const extractor = new CommonTimeExtractor(res);
+                                extractor.extract();
+                                const commonTime =
+                                    extractor.getResultInDateTime();
+
+                                // TODO: make AI choose which time to use
+                                // For now: hard code take the first common time
+
+                                const blocks = confirmationModal({
+                                    modify: this.modify,
+                                    read: this.read,
+                                    persistence: this.persistence,
+                                    http: this.http,
+                                    uiKitContext: context,
+                                    useRetry: false,
+                                    summary: `Participants: ${commonTime[0].participants}
+                                    Args: 
+                                    - Start time: ${commonTime[0].time[0]}
+                                    - End time: ${commonTime[0].time[1]}`,
+                                });
+
+                                storeData(
+                                    this.persistence,
+                                    user.id,
+                                    SCHEDULE_ARGS_KEY,
+                                    commonTime[0]
+                                );
+
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    "Schedule your meeting",
+                                    blocks
+                                );
+                            });
 
                             break;
                         }

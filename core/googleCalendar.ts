@@ -1,6 +1,6 @@
 import { IHttp } from "@rocket.chat/apps-engine/definition/accessors";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
-import { checkAvailability } from "../lib/googleCalendarSDK";
+import { checkAvailability, createEvent } from "../lib/googleCalendarSDK";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
 export async function getConstraints(
@@ -32,10 +32,28 @@ export async function getConstraints(
 }
 
 export async function setMeeting(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    user: IUser,
     emails: string[],
-    time: string
+    timeStart: string,
+    timeEnd: string
 ): Promise<object> {
-    throw new Error("Not implemented");
-    // const event = await createEvent(credentials, emails, time);
-    // return event;
+    const accessToken = await app
+        .getOauth2ClientInstance()
+        .getAccessTokenForUser(user);
+
+    if (!accessToken) {
+        throw new Error("Access token not found");
+    }
+
+    const response = await createEvent(
+        accessToken.token,
+        http,
+        emails,
+        timeStart,
+        timeEnd
+    );
+
+    return response;
 }

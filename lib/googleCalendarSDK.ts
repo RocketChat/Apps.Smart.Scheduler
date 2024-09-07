@@ -32,3 +32,41 @@ export async function checkAvailability(
 
     return JSON.parse(response.content || "{}");
 }
+
+export async function createEvent(
+    accessToken: string,
+    http: IHttp,
+    emails: string[],
+    timeStart: string,
+    timeEnd: string
+): Promise<object> {
+    const body = {
+        summary: "Created Meeting from Rocket.Chat",
+        attendees: emails.map((email) => ({ email })),
+        start: {
+            dateTime: timeStart.replace(".000Z", "+00:00"),
+            timeZone: "UTC",
+        },
+        end: {
+            dateTime: timeEnd.replace(".000Z", "+00:00"),
+            timeZone: "UTC",
+        },
+    };
+
+    const response = await http.post(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            content: JSON.stringify(body),
+        }
+    );
+
+    if (!response || response.statusCode !== 200) {
+        throw new Error("There was an error while creating the event. ");
+    }
+
+    return JSON.parse(response.content || "{}");
+}

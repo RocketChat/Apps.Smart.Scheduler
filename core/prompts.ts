@@ -1,9 +1,8 @@
-import {
-    COMMON_TIME_PROMPT,
-    PREFERRED_DATETIME_PROMPT,
-} from "../constants/prompts";
+import { IUser } from "@rocket.chat/apps-engine/definition/users";
+import { PREFERRED_DATETIME_PROMPT } from "../constants/prompts";
+import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
-import { getFormattedDate } from "../lib/dateUtils";
+import { getFormattedDate, timeToUTC } from "../lib/dateUtils";
 
 export function constructPreferredDateTimePrompt(
     utcOffset: number,
@@ -20,6 +19,7 @@ export function constructPreferredDateTimePrompt(
             weekday: "long",
             month: "long",
             day: "numeric",
+            year: "numeric",
         })}`;
     }).join("\n");
 
@@ -29,26 +29,36 @@ export function constructPreferredDateTimePrompt(
     ).replace("{days}", days);
 }
 
-export function constructConstraintPrompt(
-    dateTimeMin: string,
-    dateTimeMax: string,
+export function constructFreeBusyPrompt(
+    args: IConstraintArgs,
+    user: IUser,
     response: IFreeBusyResponse
 ): string {
-    const calendars = Object.keys(response.calendars);
+    const dateTimeMin = timeToUTC(
+        args.preferredDate,
+        args.timeMin,
+        user.utcOffset
+    );
+    const dateTimeMax = timeToUTC(
+        args.preferredDate,
+        args.timeMax,
+        user.utcOffset
+    );
 
-    let prompt = `General Constraints:
-    - Preferable from ${dateTimeMin} to ${dateTimeMax}\n`;
+    const calendars = Object.keys(response.calendars);
+    let prompt = `General Constraint
+    - Preferable from ${dateTimeMin}Z to ${dateTimeMax}Z\n`;
 
     calendars.forEach((calendar) => {
+        prompt += `\n${calendar}\n`;
         const busy = response.calendars[calendar].busy;
         if (busy.length !== 0) {
-            prompt += `\n${calendar}:\n`;
             busy.forEach((time) => {
                 prompt += `- Busy from ${time.start} to ${time.end}\n`;
             });
         }
-        prompt += "- Office hours from 01:00:00Z to 09:00:00Z\n"; // TODO: Hardcoded office hours
+        prompt += `- Office hours from ${args.preferredDate}T01:00:00Z to ${args.preferredDate}T09:00:00Z\n`; // TODO: Hardcoded office hours
     });
 
-    return COMMON_TIME_PROMPT.replace("{prompt}", prompt);
+    return prompt;
 }

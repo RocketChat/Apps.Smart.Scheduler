@@ -4,15 +4,15 @@ import {
 } from "@rocket.chat/apps-engine/definition/accessors";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { PREFFERED_ARGS_KEY } from "../constants/keys";
+import { COMMON_TIME_PROMPT } from "../constants/prompts";
 import {
-    constructConstraintPrompt,
+    constructFreeBusyPrompt,
     constructPreferredDateTimePrompt,
 } from "../core/prompts";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
 import { storeData } from "../lib/dataStore";
-import { timeToUTC } from "../lib/dateUtils";
 import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { getConstraints } from "./googleCalendar";
@@ -95,7 +95,7 @@ export async function generateCommonTime(
     http: IHttp,
     constraintPrompt: string
 ): Promise<string> {
-    return `2024-09-02T02:30:00Z to 2024-09-02T03:00:00Z`;
+    return `2024-09-09T02:30:00Z to 2024-09-09T03:00:00Z`;
     const body = {
         messages: [
             {
@@ -122,7 +122,7 @@ export async function getConstraintArguments(
                 ${prompt}
                 Into the following format, example:
                 {
-                    "preferredDate": "2021-09-01", // YYYY-MM-DD
+                    "preferredDate": "2021-12-31", // YYYY-MM-DD
                     "timeMin": "09:00:00", // HH:MM:SS
                     "timeMax": "17:00:00", // HH:MM:SS
                 }`,
@@ -154,8 +154,8 @@ export async function getMeetingArguments(
                 ${prompt}
                 Into array of item using following format, example:
                 {
-                    "datetimeStart": "2021-09-01T09:00:00Z", // Meeting start. Use ISO 8601 format
-                    "datetimeEnd": "2021-09-01T17:00:00Z", // Meeting end. Use ISO 8601 format
+                    "datetimeStart": "2021-12-31T09:00:00Z", // Meeting start. Use ISO 8601 format
+                    "datetimeEnd": "2021-12-31T17:00:00Z", // Meeting end. Use ISO 8601 format
                 }
                 Do not output any other information. Only use the fields above.    
                 `,
@@ -260,14 +260,25 @@ export async function generateConstraintPromptHelper(
         args.preferredDate
     ).then((res) => res)) as IFreeBusyResponse;
 
-    const timeMin = timeToUTC(args.preferredDate, args.timeMin, user.utcOffset);
-    const timeMax = timeToUTC(args.preferredDate, args.timeMax, user.utcOffset);
+    const constraintPrompt = constructFreeBusyPrompt(args, user, constraints);
+    return COMMON_TIME_PROMPT.replace("{prompt}", constraintPrompt);
+}
 
-    const constraintPrompt = constructConstraintPrompt(
-        timeMin,
-        timeMax,
-        constraints
-    );
+export async function generatePromptForAlgorithm(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    user: IUser,
+    emails: string[],
+    args: IConstraintArgs
+): Promise<string> {
+    const constraints = (await getConstraints(
+        app,
+        http,
+        user,
+        emails,
+        args.preferredDate
+    ).then((res) => res)) as IFreeBusyResponse;
 
+    const constraintPrompt = constructFreeBusyPrompt(args, user, constraints);
     return constraintPrompt;
 }

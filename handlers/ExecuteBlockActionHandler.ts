@@ -14,7 +14,9 @@ import {
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
+    SCHEDULE_ARGS_KEY,
 } from "../constants/keys";
+import { setMeeting } from "../core/googleCalendar";
 import {
     generateCommonTime,
     generateConstraintPrompt,
@@ -53,6 +55,22 @@ export class ExecuteBlockActionHandler {
 
         switch (actionId) {
             case "Schedule": {
+                const { participants, time } = await getData(
+                    readPersistence,
+                    user.id,
+                    SCHEDULE_ARGS_KEY
+                );
+
+                // TODO: check response
+                await setMeeting(
+                    this.app,
+                    this.http,
+                    user,
+                    participants,
+                    time[0],
+                    time[1]
+                );
+
                 await sendNotification(
                     this.read,
                     this.modify,
