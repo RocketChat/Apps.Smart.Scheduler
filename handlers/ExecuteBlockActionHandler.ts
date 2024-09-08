@@ -17,14 +17,8 @@ import {
     SCHEDULE_ARGS_KEY,
 } from "../constants/keys";
 import { setMeeting } from "../core/googleCalendar";
-import {
-    generateCommonTime,
-    generateConstraintPrompt,
-    getMeetingArguments,
-} from "../core/llms";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
-import { confirmationModal } from "../modals/confirmationModal";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
 export class ExecuteBlockActionHandler {
@@ -127,74 +121,7 @@ export class ExecuteBlockActionHandler {
                         );
                     }
 
-                    generateConstraintPrompt(
-                        this.app,
-                        this.http,
-                        user,
-                        participants,
-                        prompt,
-                        this.persistence,
-                        this.read,
-                        this.modify,
-                        room
-                    )
-                        .then((res) => {
-                            sendNotification(
-                                this.read,
-                                this.modify,
-                                user,
-                                room,
-                                `> Constraint prompt: ${res}`
-                            );
-
-                            return generateCommonTime(
-                                this.app,
-                                this.http,
-                                res
-                            ).then((res) => {
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    `> Common time: ${res}`
-                                );
-                                return getMeetingArguments(
-                                    this.app,
-                                    this.http,
-                                    res,
-                                    user,
-                                    this.read,
-                                    this.modify,
-                                    room
-                                ).then((res) => {
-                                    const blocks = confirmationModal({
-                                        modify: this.modify,
-                                        read: this.read,
-                                        persistence: this.persistence,
-                                        http: this.http,
-                                        uiKitContext: context,
-                                        summary: `Participants: ${participants}
-                                        Args: 
-                                        - Start time: ${res.datetimeStart}
-                                        - End time: ${res.datetimeEnd}
-                                        `,
-                                    });
-
-                                    sendNotification(
-                                        this.read,
-                                        this.modify,
-                                        user,
-                                        room,
-                                        `Schedule your meeting`,
-                                        blocks
-                                    );
-
-                                    return res;
-                                });
-                            });
-                        })
-                        .catch((e) => this.app.getLogger().error(e));
+                    // TODO: Implement retry
 
                     sendNotification(
                         this.read,

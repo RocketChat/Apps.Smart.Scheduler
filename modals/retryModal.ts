@@ -11,7 +11,6 @@ import { TextObjectType } from "@rocket.chat/apps-engine/definition/uikit/blocks
 import { ModalEnum } from "../constants/enums";
 import { ROOM_ID_KEY } from "../constants/keys";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
-import { IParticipantProps } from "../definitions/IParticipantProps";
 import { getData, storeData } from "../lib/dataStore";
 
 export async function retryModal({
@@ -38,7 +37,6 @@ export async function retryModal({
         slashCommandContext?.getSender() ||
         uiKitContext?.getInteractionData().user;
 
-    let participantOptions: IParticipantProps[] = Array();
     if (user?.id) {
         let roomId: string;
 
@@ -50,25 +48,6 @@ export async function retryModal({
                 await getData(read.getPersistenceReader(), user.id, ROOM_ID_KEY)
             ).roomId;
         }
-
-        const members = await read.getRoomReader().getMembers(roomId);
-        for (const member of members) {
-            if (member.id !== user.id) {
-                participantOptions.push({
-                    text: {
-                        type: TextObjectType.MARKDOWN,
-                        text: `${member.name} - @${member.username} - ${member.emails[0].address}`,
-                    },
-                    value: member.emails[0].address,
-                });
-            }
-        }
-
-        participantOptions.sort((a, b) => {
-            return a.text.text.toUpperCase() < b.text.text.toUpperCase()
-                ? -1
-                : 1;
-        });
     }
 
     const blocks = modify.getCreator().getBlockBuilder();
@@ -132,38 +111,38 @@ export async function retryModal({
         }),
     });
 
-    blocks.addDividerBlock();
+    // blocks.addDividerBlock();
 
-    blocks.addInputBlock({
-        blockId: "algorithmBlockId",
-        label: {
-            text: "Execute with:",
-            type: TextObjectType.PLAINTEXT,
-        },
-        element: blocks.newStaticSelectElement({
-            actionId: "algorithmBlockId",
-            placeholder: {
-                text: "Select algorithm",
-                type: TextObjectType.PLAINTEXT,
-            },
-            options: [
-                {
-                    text: {
-                        type: TextObjectType.PLAINTEXT,
-                        text: "algorithm",
-                    },
-                    value: "algorithm",
-                },
-                {
-                    text: {
-                        type: TextObjectType.PLAINTEXT,
-                        text: "llm",
-                    },
-                    value: "llm",
-                },
-            ],
-        }),
-    });
+    // blocks.addInputBlock({
+    //     blockId: "algorithmBlockId",
+    //     label: {
+    //         text: "Execute with:",
+    //         type: TextObjectType.PLAINTEXT,
+    //     },
+    //     element: blocks.newStaticSelectElement({
+    //         actionId: "algorithmBlockId",
+    //         placeholder: {
+    //             text: "Select algorithm",
+    //             type: TextObjectType.PLAINTEXT,
+    //         },
+    //         options: [
+    //             {
+    //                 text: {
+    //                     type: TextObjectType.PLAINTEXT,
+    //                     text: "algorithm",
+    //                 },
+    //                 value: "algorithm",
+    //             },
+    //             {
+    //                 text: {
+    //                     type: TextObjectType.PLAINTEXT,
+    //                     text: "llm",
+    //                 },
+    //                 value: "llm",
+    //             },
+    //         ],
+    //     }),
+    // });
 
     return {
         id: ModalEnum.RETRY_MODAL,

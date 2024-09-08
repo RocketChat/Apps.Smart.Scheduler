@@ -9,13 +9,10 @@ import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/defi
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { ModalEnum } from "../constants/enums";
 import {
-    generateCommonTime,
     generateConstraintPrompt,
-    generateConstraintPromptHelper,
     generatePromptForAlgorithm,
-    getMeetingArguments,
+    getRecommendedTime,
 } from "../core/llms";
-import { confirmationModal } from "../modals/confirmationModal";
 // import { generateChatCompletions } from "../core/llms";
 import {
     PARTICIPANT_KEY,
@@ -23,7 +20,6 @@ import {
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
-    SCHEDULE_ARGS_KEY,
 } from "../constants/keys";
 import { CommonTimeExtractor } from "../core/algorithm";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
@@ -126,53 +122,51 @@ export class ExecuteViewSubmitHandler {
                         this.app,
                         this.http,
                         user,
-                        participants,
                         prompt,
                         this.persistence,
                         this.read,
                         this.modify,
                         room
                     )
-                        .then((res) =>
-                            generateCommonTime(this.app, this.http, res).then(
-                                (res) => {
-                                    return getMeetingArguments(
-                                        this.app,
-                                        this.http,
-                                        res,
-                                        user,
+                        .then((res) => {
+                            generatePromptForAlgorithm(
+                                this.app,
+                                this.http,
+                                user,
+                                participants,
+                                res
+                            ).then((res) => {
+                                const extractor = new CommonTimeExtractor(res);
+                                extractor.extract();
+
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `Common time: ${JSON.stringify(
+                                        extractor.getResultInDateTime()
+                                    )}`
+                                );
+
+                                getRecommendedTime(
+                                    this.app,
+                                    this.http,
+                                    prompt,
+                                    extractor.getResultInDateTime()
+                                ).then((res) => {
+                                    sendNotification(
                                         this.read,
                                         this.modify,
-                                        room
-                                    ).then((res) => {
-                                        const blocks = confirmationModal({
-                                            modify: this.modify,
-                                            read: this.read,
-                                            persistence: this.persistence,
-                                            http: this.http,
-                                            uiKitContext: context,
-                                            useRetry: false,
-                                            summary: `Participants: ${participants}
-                                            Args: 
-                                            - Start time: ${res.datetimeStart}
-                                            - End time: ${res.datetimeEnd}
-                                        `,
-                                        });
-
-                                        sendNotification(
-                                            this.read,
-                                            this.modify,
-                                            user,
-                                            room,
-                                            "Schedule your meeting. Use `/schedule retry` if you are not satisfied.",
-                                            blocks
-                                        );
-
-                                        return res;
-                                    });
-                                }
-                            )
-                        )
+                                        user,
+                                        room,
+                                        `Recommended time prompt: ${JSON.stringify(
+                                            res
+                                        )}`
+                                    );
+                                });
+                            });
+                        })
                         .catch((e) => this.app.getLogger().error(e));
 
                     break;
@@ -206,12 +200,6 @@ export class ExecuteViewSubmitHandler {
                             error: "No prompt found",
                         };
                     }
-
-                    const { participants } = await getData(
-                        readPersistence,
-                        user.id,
-                        PARTICIPANT_KEY
-                    );
 
                     const { count } = await getData(
                         readPersistence,
@@ -254,132 +242,7 @@ export class ExecuteViewSubmitHandler {
                         newArgs
                     );
 
-                    const algorithm =
-                        view.state?.["algorithmBlockId"]["algorithmBlockId"] ||
-                        "llm";
-
-                    switch (algorithm) {
-                        case "llm": {
-                            generateConstraintPromptHelper(
-                                this.app,
-                                this.http,
-                                user,
-                                participants,
-                                newArgs
-                            )
-                                .then((res) => {
-                                    generateCommonTime(
-                                        this.app,
-                                        this.http,
-                                        res
-                                    ).then((res) => {
-                                        return getMeetingArguments(
-                                            this.app,
-                                            this.http,
-                                            res,
-                                            user,
-                                            this.read,
-                                            this.modify,
-                                            room
-                                        ).then((res) => {
-                                            const blocks = confirmationModal({
-                                                modify: this.modify,
-                                                read: this.read,
-                                                persistence: this.persistence,
-                                                http: this.http,
-                                                uiKitContext: context,
-                                                useRetry: false,
-                                                summary: `Participants: ${participants}
-                                                Args: 
-                                                - Start time: ${res.datetimeStart}
-                                                - End time: ${res.datetimeEnd}
-                                                `,
-                                            });
-
-                                            sendNotification(
-                                                this.read,
-                                                this.modify,
-                                                user,
-                                                room,
-                                                "Schedule your meeting",
-                                                blocks
-                                            );
-
-                                            return res;
-                                        });
-                                    });
-                                })
-                                .catch((e) => this.app.getLogger().error(e));
-
-                            break;
-                        }
-                        case "algorithm": {
-                            await sendNotification(
-                                this.read,
-                                this.modify,
-                                user,
-                                room,
-                                "Algorithm is running..."
-                            );
-
-                            generatePromptForAlgorithm(
-                                this.app,
-                                this.http,
-                                user,
-                                participants,
-                                newArgs
-                            ).then((res) => {
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    `> ${res}`
-                                );
-
-                                const extractor = new CommonTimeExtractor(res);
-                                extractor.extract();
-                                const commonTime =
-                                    extractor.getResultInDateTime();
-
-                                // TODO: make AI choose which time to use
-                                // For now: hard code take the first common time
-
-                                const blocks = confirmationModal({
-                                    modify: this.modify,
-                                    read: this.read,
-                                    persistence: this.persistence,
-                                    http: this.http,
-                                    uiKitContext: context,
-                                    useRetry: false,
-                                    summary: `Participants: ${commonTime[0].participants}
-                                    Args: 
-                                    - Start time: ${commonTime[0].time[0]}
-                                    - End time: ${commonTime[0].time[1]}`,
-                                });
-
-                                storeData(
-                                    this.persistence,
-                                    user.id,
-                                    SCHEDULE_ARGS_KEY,
-                                    commonTime[0]
-                                );
-
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    "Schedule your meeting",
-                                    blocks
-                                );
-                            });
-
-                            break;
-                        }
-                    }
-
-                    break;
+                    // TODO: retrigger algorithm
                 }
             }
 
