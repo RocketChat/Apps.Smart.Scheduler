@@ -56,7 +56,7 @@ export async function pickModal({
 
     blocks.addSectionBlock({
         text: blocks.newMarkdownTextObject(
-            `What time would you like to schedule the meeting?`
+            `Assuming all participants should join, what time would you like to schedule the meeting?`
         ),
     });
 

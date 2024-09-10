@@ -17,6 +17,7 @@ import {
 // import { generateChatCompletions } from "../core/llms";
 import {
     COMMON_TIMES_KEY,
+    MEETING_ARGS_KEY,
     PARTICIPANT_KEY,
     PREFFERED_ARGS_KEY,
     PROMPT_KEY,
@@ -28,6 +29,7 @@ import { setMeeting } from "../core/googleCalendar";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
+import { confirmationBlock } from "../modals/confirmationBlock";
 
 export class ExecuteViewSubmitHandler {
     constructor(
@@ -71,6 +73,12 @@ export class ExecuteViewSubmitHandler {
                         readPersistence,
                         user.id,
                         PREFFERED_ARGS_KEY
+                    );
+
+                    const { meetingSummary } = await getData(
+                        readPersistence,
+                        user.id,
+                        MEETING_ARGS_KEY
                     );
 
                     const { participants } = await getData(
@@ -117,14 +125,15 @@ export class ExecuteViewSubmitHandler {
                         user,
                         participants,
                         startTime.toISOString(),
-                        endTime.toISOString()
-                    ).then((res) => {
+                        endTime.toISOString(),
+                        meetingSummary
+                    ).then(() => {
                         sendNotification(
                             this.read,
                             this.modify,
                             user,
                             room,
-                            `Meeting scheduled: ${JSON.stringify(res)}`
+                            "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
                         );
                     });
 
@@ -164,7 +173,7 @@ export class ExecuteViewSubmitHandler {
                         { count: 1 }
                     );
 
-                    // TODO: Validate user input: prompt injection, 0 participants, etc.
+                    // TODO: Validate user input
                     if (!prompt || !participants) {
                         sendNotification(
                             this.read,
@@ -180,10 +189,7 @@ export class ExecuteViewSubmitHandler {
                         this.http,
                         user,
                         prompt,
-                        this.persistence,
-                        this.read,
-                        this.modify,
-                        room
+                        this.persistence
                     )
                         .then((res) => {
                             generatePromptForAlgorithm(
@@ -233,14 +239,28 @@ export class ExecuteViewSubmitHandler {
                                         this.http,
                                         res
                                     ).then((res) => {
+                                        storeData(
+                                            this.persistence,
+                                            user.id,
+                                            MEETING_ARGS_KEY,
+                                            res
+                                        );
+
+                                        const blocks = confirmationBlock({
+                                            modify: this.modify,
+                                            read: this.read,
+                                            persistence: this.persistence,
+                                            http: this.http,
+                                            summary: res,
+                                        });
+
                                         sendNotification(
                                             this.read,
                                             this.modify,
                                             user,
                                             room,
-                                            `Meeting arguments: ${JSON.stringify(
-                                                res
-                                            )}`
+                                            "Schedule the meeting",
+                                            blocks
                                         );
                                     });
                                 });
@@ -331,16 +351,6 @@ export class ExecuteViewSubmitHandler {
                                 extractor.getResultInDateTime()
                             );
 
-                            sendNotification(
-                                this.read,
-                                this.modify,
-                                user,
-                                room,
-                                `Common time: ${JSON.stringify(
-                                    extractor.getResultInDateTime()
-                                )}`
-                            );
-
                             getRecommendedTime(
                                 this.app,
                                 this.http,
@@ -362,14 +372,28 @@ export class ExecuteViewSubmitHandler {
                                     this.http,
                                     res
                                 ).then((res) => {
+                                    storeData(
+                                        this.persistence,
+                                        user.id,
+                                        MEETING_ARGS_KEY,
+                                        res
+                                    );
+
+                                    const blocks = confirmationBlock({
+                                        modify: this.modify,
+                                        read: this.read,
+                                        persistence: this.persistence,
+                                        http: this.http,
+                                        summary: res,
+                                    });
+
                                     sendNotification(
                                         this.read,
                                         this.modify,
                                         user,
                                         room,
-                                        `Meeting arguments: ${JSON.stringify(
-                                            res
-                                        )}`
+                                        "Schedule the meeting",
+                                        blocks
                                     );
                                 });
                             });

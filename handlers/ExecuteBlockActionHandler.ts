@@ -10,13 +10,14 @@ import {
     UIKitBlockInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
 import {
+    MEETING_ARGS_KEY,
     PARTICIPANT_KEY,
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
-    SCHEDULE_ARGS_KEY,
 } from "../constants/keys";
 import { setMeeting } from "../core/googleCalendar";
+import { IMeetingArgs } from "../definitions/IMeetingArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
@@ -49,29 +50,29 @@ export class ExecuteBlockActionHandler {
 
         switch (actionId) {
             case "Schedule": {
-                const { participants, time } = await getData(
+                const args: IMeetingArgs = await getData(
                     readPersistence,
                     user.id,
-                    SCHEDULE_ARGS_KEY
+                    MEETING_ARGS_KEY
                 );
 
-                // TODO: check response
-                await setMeeting(
+                setMeeting(
                     this.app,
                     this.http,
                     user,
-                    participants,
-                    time[0],
-                    time[1]
-                );
-
-                await sendNotification(
-                    this.read,
-                    this.modify,
-                    user,
-                    room,
-                    "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
-                );
+                    args.participants,
+                    args.datetimeStart,
+                    args.datetimeEnd,
+                    args.meetingSummary
+                ).then(() => {
+                    sendNotification(
+                        this.read,
+                        this.modify,
+                        user,
+                        room,
+                        "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
+                    );
+                });
 
                 return context.getInteractionResponder().successResponse();
             }

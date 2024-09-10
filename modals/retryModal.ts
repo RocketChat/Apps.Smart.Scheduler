@@ -56,7 +56,7 @@ export async function retryModal({
         blockId: "guideBlockId",
         text: blocks.newMarkdownTextObject(
             `
-            Here's your current preferred:
+            Here's your current preference:
             - **Preferred date**: ${preferredArgs.preferredDate}
             - **Preferred time**: ${preferredArgs.timeMin} - ${preferredArgs.timeMax}
 

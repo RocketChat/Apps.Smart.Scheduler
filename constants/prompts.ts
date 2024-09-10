@@ -69,25 +69,41 @@ Q1: 2024-05-06
 Q2: Late afternoon (15:00-16:00)
 `;
 
-export const COMMON_TIME_PROMPT = `
-You are a scheduling assistant who will help a group of people to find suitable meeting time for them. The definitions of free time are
-1. Time between busy schedule, 
-2. Office hour start to the first busy schedule, or 
-3. Last busy schedule to end of office hours.
-
-Based on this prompt:
-{prompt}
-What is their common free time? 
-`;
-
 export const RECOMMENDED_COMMON_TIME_PROMPT = `
 You are a helpful assistant who will help people to find the best time to meet. We find several common times for participants to meet. 
-{common_time}
 
-Based on this prompt:
+Context:
 {prompt}
-What is the best time for them to meet? Determine the following: 
+1. What is the topic of the meeting? 
+
+Based on the context, choose one of the common times below.
+{common_time}
+Determine the following: 
 1. The participants who can attend the meeting,
 2. The time that is suitable for all participants, and
-3. The duration of the meeting. Pick only one of these: 15 minutes, 30 minutes, 45 minutes, 60 minutes, 90 minutes, 120 minutes.
+3. The duration of the meeting. Do not exceed max durations.
+
+Answer it concisely.
+`;
+
+export const CONSTRAINT_ARGS_PROMPT = `
+Based on this prompt:
+{prompt}
+Extract the following arguments:
+{
+    "preferredDate": "2021-12-31", // YYYY-MM-DD
+    "timeMin": "09:00:00", // HH:MM:SS
+    "timeMax": "17:00:00", // HH:MM:SS
+}`;
+
+export const MEETING_ARGS_PROMPT = `
+Based on this prompt:
+{prompt}
+Extract the following arguments:
+{
+    "meetingSummary": "string", // Topic of the meeting  
+    "participants": ["email@example.com", "second.email@example.com"], // Array of emails
+    "datetimeStart": "2021-12-31T09:00:00Z", // Meeting start. Use ISO 8601 format
+    "datetimeEnd": "2021-12-31T17:00:00Z", // Meeting end. Use ISO 8601 format
+}
 `;

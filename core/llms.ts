@@ -5,7 +5,8 @@ import {
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { PREFFERED_ARGS_KEY } from "../constants/keys";
 import {
-    COMMON_TIME_PROMPT,
+    CONSTRAINT_ARGS_PROMPT,
+    MEETING_ARGS_PROMPT,
     RECOMMENDED_COMMON_TIME_PROMPT,
 } from "../constants/prompts";
 import {
@@ -17,7 +18,6 @@ import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
 import { storeData } from "../lib/dataStore";
-import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { getConstraints } from "./googleCalendar";
 
@@ -122,14 +122,7 @@ export async function getConstraintArguments(
         messages: [
             {
                 role: "system",
-                content: `Turn this prompt: 
-                ${prompt}
-                Into the following format, example:
-                {
-                    "preferredDate": "2021-12-31", // YYYY-MM-DD
-                    "timeMin": "09:00:00", // HH:MM:SS
-                    "timeMax": "17:00:00", // HH:MM:SS
-                }`,
+                content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
             },
         ],
         format: "json",
@@ -140,46 +133,12 @@ export async function getConstraintArguments(
     return args;
 }
 
-export async function getMeetingArguments(
-    app: SmartSchedulingApp,
-    http: IHttp,
-    prompt: string
-): Promise<IMeetingArgs> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: `Turn this prompt: 
-                ${prompt}
-                Into array of item using following format, example:
-                {
-                    "participants": ["email@example.com", "second.email@example.com"], // Array of emails
-                    "datetimeStart": "2021-12-31T09:00:00Z", // Meeting start. Use ISO 8601 format
-                    "datetimeEnd": "2021-12-31T17:00:00Z", // Meeting end. Use ISO 8601 format
-                }
-                Do not output any other information. Only use the fields above.    
-                `,
-            },
-        ],
-        format: "json",
-    };
-
-    const response = await generateChatCompletions(app, http, body);
-    const args: IMeetingArgs = JSON.parse(response);
-
-    return args;
-}
-
 export async function generateConstraintPrompt(
     app: SmartSchedulingApp,
     http: IHttp,
     user: IUser,
     prompt: string,
-    persistence: IPersistence,
-    // DEBUG
-    read: any,
-    modify: any,
-    room: any
+    persistence: IPersistence
 ): Promise<IConstraintArgs> {
     const preferredDateTime = await generatePreferredDateTime(
         app,
@@ -188,51 +147,11 @@ export async function generateConstraintPrompt(
         prompt
     );
 
-    // DEBUG
-    await sendNotification(
-        read,
-        modify,
-        user,
-        room,
-        `Prompt: ${prompt}
-        -----------
-        Preferred date time: 
-        ${preferredDateTime}\n`
-    );
-
     const args = await getConstraintArguments(app, http, preferredDateTime);
 
     await storeData(persistence, user.id, PREFFERED_ARGS_KEY, args);
 
-    // DEBUG
-    await sendNotification(
-        read,
-        modify,
-        user,
-        room,
-        `Args: ${JSON.stringify(args)} \n`
-    );
-
     return args;
-}
-
-export async function generatePromptForLLM(
-    app: SmartSchedulingApp,
-    http: IHttp,
-    user: IUser,
-    emails: string[],
-    args: IConstraintArgs
-): Promise<string> {
-    const constraints = (await getConstraints(
-        app,
-        http,
-        user,
-        emails,
-        args.preferredDate
-    ).then((res) => res)) as IFreeBusyResponse;
-
-    const constraintPrompt = constructFreeBusyPrompt(args, user, constraints);
-    return COMMON_TIME_PROMPT.replace("{prompt}", constraintPrompt);
 }
 
 export async function generatePromptForAlgorithm(
@@ -266,6 +185,10 @@ export async function getRecommendedTime(
             index + 1
         }. Participants: ${commonTime.participants.join(", ")}
         Time: ${commonTime.time[0]} to ${commonTime.time[1]}
+        Max duration: ${
+            new Date(commonTime.time[1]).getMinutes() -
+            new Date(commonTime.time[0]).getMinutes()
+        } minutes
         ----------------`;
     });
 
@@ -283,4 +206,25 @@ export async function getRecommendedTime(
 
     const response = await generateChatCompletions(app, http, body);
     return response;
+}
+
+export async function getMeetingArguments(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    prompt: string
+): Promise<IMeetingArgs> {
+    const body = {
+        messages: [
+            {
+                role: "system",
+                content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
+            },
+        ],
+        format: "json",
+    };
+
+    const response = await generateChatCompletions(app, http, body);
+    const args: IMeetingArgs = JSON.parse(response);
+
+    return args;
 }

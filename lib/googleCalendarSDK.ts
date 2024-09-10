@@ -38,10 +38,11 @@ export async function createEvent(
     http: IHttp,
     emails: string[],
     timeStart: string,
-    timeEnd: string
+    timeEnd: string,
+    meetingSummary: string
 ): Promise<object> {
     const body = {
-        summary: "Created Meeting from Rocket.Chat",
+        summary: meetingSummary,
         attendees: emails.map((email) => ({ email })),
         start: {
             dateTime: timeStart.replace(".000Z", "+00:00"),
