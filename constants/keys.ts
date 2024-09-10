@@ -6,3 +6,4 @@ export const TRIGGER_ID_KEY = "SmartScheduling.TriggerId";
 export const RETRY_COUNT_KEY = "SmartScheduling.RetryCount";
 export const PREFFERED_ARGS_KEY = "SmartScheduling.PreferredArgs";
 export const SCHEDULE_ARGS_KEY = "SmartScheduling.ScheduleArgs";
+export const COMMON_TIMES_KEY = "SmartScheduling.CommonTimes";

@@ -89,5 +89,5 @@ Based on this prompt:
 What is the best time for them to meet? Determine the following: 
 1. The participants who can attend the meeting,
 2. The time that is suitable for all participants, and
-3. The duration of the meeting.
+3. The duration of the meeting. Pick only one of these: 15 minutes, 30 minutes, 45 minutes, 60 minutes, 90 minutes, 120 minutes.
 `;

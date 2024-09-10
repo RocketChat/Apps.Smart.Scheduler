@@ -7,17 +7,19 @@ import {
 import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashcommands";
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
 import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder";
+import { TextObjectType } from "@rocket.chat/apps-engine/definition/uikit/blocks";
 import { ModalEnum } from "../constants/enums";
 import { ROOM_ID_KEY } from "../constants/keys";
-import { IConstraintArgs } from "../definitions/IConstraintArgs";
+import { ICommonTimeString } from "../definitions/ICommonTime";
 import { getData, storeData } from "../lib/dataStore";
 
-export async function retryModal({
+export async function pickModal({
     modify,
     read,
     persistence,
     http,
-    preferenceArgs,
+    preferredDate,
+    availableTimes,
     slashCommandContext,
     uiKitContext,
 }: {
@@ -25,7 +27,8 @@ export async function retryModal({
     read: IRead;
     persistence: IPersistence;
     http: IHttp;
-    preferenceArgs: IConstraintArgs;
+    preferredDate: string;
+    availableTimes: ICommonTimeString[];
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
 }): Promise<IUIKitModalViewParam> {
@@ -50,6 +53,74 @@ export async function retryModal({
     }
 
     const blocks = modify.getCreator().getBlockBuilder();
+
+    blocks.addSectionBlock({
+        text: blocks.newMarkdownTextObject(
+            `What time would you like to schedule the meeting?`
+        ),
+    });
+
+    blocks.addInputBlock({
+        blockId: "preferredDateBlockId",
+        label: {
+            text: "Preferred date:",
+            type: TextObjectType.PLAINTEXT,
+        },
+        element: blocks.newPlainTextInputElement({
+            actionId: "preferredDateBlockId",
+            placeholder: {
+                text: `${preferredDate}`,
+                type: TextObjectType.PLAINTEXT,
+            },
+        }),
+    });
+
+    blocks.addInputBlock({
+        blockId: "preferredTimeBlockId",
+        label: {
+            text: "Preferred time:",
+            type: TextObjectType.PLAINTEXT,
+        },
+        element: blocks.newStaticSelectElement({
+            actionId: "preferredTimeBlockId",
+            placeholder: {
+                text: "Select a time",
+                type: TextObjectType.PLAINTEXT,
+            },
+            options: availableTimes.map((commonTime) => ({
+                text: {
+                    text: `${commonTime.time[0]
+                        .split("T")[1]
+                        .replace(".000Z", "")}`,
+                    type: TextObjectType.PLAINTEXT,
+                },
+                value: commonTime.time[0].split("T")[1].replace(".000Z", ""),
+            })),
+        }),
+    });
+
+    const durationOptions = [15, 30, 45, 60, 90, 120];
+    blocks.addInputBlock({
+        blockId: "preferredDurationBlockId",
+        label: {
+            text: "Preferred duration:",
+            type: TextObjectType.PLAINTEXT,
+        },
+        element: blocks.newStaticSelectElement({
+            actionId: "preferredDurationBlockId",
+            placeholder: {
+                text: "Select a duration",
+                type: TextObjectType.PLAINTEXT,
+            },
+            options: durationOptions.map((duration) => ({
+                text: {
+                    text: `${duration} minutes`,
+                    type: TextObjectType.PLAINTEXT,
+                },
+                value: duration.toString(),
+            })),
+        }),
+    });
 
     return {
         id: ModalEnum.PICK_MODAL,

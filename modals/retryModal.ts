@@ -18,7 +18,7 @@ export async function retryModal({
     read,
     persistence,
     http,
-    preferenceArgs,
+    preferredArgs,
     slashCommandContext,
     uiKitContext,
 }: {
@@ -26,7 +26,7 @@ export async function retryModal({
     read: IRead;
     persistence: IPersistence;
     http: IHttp;
-    preferenceArgs: IConstraintArgs;
+    preferredArgs: IConstraintArgs;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
 }): Promise<IUIKitModalViewParam> {
@@ -56,93 +56,60 @@ export async function retryModal({
         blockId: "guideBlockId",
         text: blocks.newMarkdownTextObject(
             `
-            Here's your current preference:
-            - **Preferred date**: ${preferenceArgs.preferredDate}
-            - **Preferred time**: ${preferenceArgs.timeMin} - ${preferenceArgs.timeMax}
+            Here's your current preferred:
+            - **Preferred date**: ${preferredArgs.preferredDate}
+            - **Preferred time**: ${preferredArgs.timeMin} - ${preferredArgs.timeMax}
 
-            If you want to change your preference, please update the fields below. 
+            If you want to change your preferred, please update the fields below. 
             Otherwise, leave them as is and click the "Schedule" button.
             `
         ),
     });
 
     blocks.addInputBlock({
-        blockId: "preferenceDateBlockId",
+        blockId: "preferredDateBlockId",
         label: {
-            text: "Preference date:",
+            text: "Preferred date:",
             type: TextObjectType.PLAINTEXT,
         },
         element: blocks.newPlainTextInputElement({
-            actionId: "preferenceDateBlockId",
+            actionId: "preferredDateBlockId",
             placeholder: {
-                text: `${preferenceArgs.preferredDate}`,
+                text: `${preferredArgs.preferredDate}`,
                 type: TextObjectType.PLAINTEXT,
             },
         }),
     });
 
     blocks.addInputBlock({
-        blockId: "preferenceTimeMinBlockId",
+        blockId: "preferredTimeMinBlockId",
         label: {
-            text: "Preference start time:",
+            text: "Preferred start time:",
             type: TextObjectType.PLAINTEXT,
         },
         element: blocks.newPlainTextInputElement({
-            actionId: "preferenceTimeMinBlockId",
+            actionId: "preferredTimeMinBlockId",
             placeholder: {
-                text: `${preferenceArgs.timeMin}`,
+                text: `${preferredArgs.timeMin}`,
                 type: TextObjectType.PLAINTEXT,
             },
         }),
     });
 
     blocks.addInputBlock({
-        blockId: "preferenceTimeMaxBlockId",
+        blockId: "preferredTimeMaxBlockId",
         label: {
-            text: "Preference end time:",
+            text: "Preferred end time:",
             type: TextObjectType.PLAINTEXT,
         },
         element: blocks.newPlainTextInputElement({
-            actionId: "preferenceTimeMaxBlockId",
+            actionId: "preferredTimeMaxBlockId",
             placeholder: {
-                text: `${preferenceArgs.timeMax}`,
+                text: `${preferredArgs.timeMax}`,
                 type: TextObjectType.PLAINTEXT,
             },
         }),
     });
-
-    // blocks.addDividerBlock();
-
-    // blocks.addInputBlock({
-    //     blockId: "algorithmBlockId",
-    //     label: {
-    //         text: "Execute with:",
-    //         type: TextObjectType.PLAINTEXT,
-    //     },
-    //     element: blocks.newStaticSelectElement({
-    //         actionId: "algorithmBlockId",
-    //         placeholder: {
-    //             text: "Select algorithm",
-    //             type: TextObjectType.PLAINTEXT,
-    //         },
-    //         options: [
-    //             {
-    //                 text: {
-    //                     type: TextObjectType.PLAINTEXT,
-    //                     text: "algorithm",
-    //                 },
-    //                 value: "algorithm",
-    //             },
-    //             {
-    //                 text: {
-    //                     type: TextObjectType.PLAINTEXT,
-    //                     text: "llm",
-    //                 },
-    //                 value: "llm",
-    //             },
-    //         ],
-    //     }),
-    // });
 
     return {
         id: ModalEnum.RETRY_MODAL,

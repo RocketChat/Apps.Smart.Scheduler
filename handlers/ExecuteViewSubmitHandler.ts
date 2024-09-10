@@ -11,10 +11,12 @@ import { ModalEnum } from "../constants/enums";
 import {
     generateConstraintPrompt,
     generatePromptForAlgorithm,
+    getMeetingArguments,
     getRecommendedTime,
 } from "../core/llms";
 // import { generateChatCompletions } from "../core/llms";
 import {
+    COMMON_TIMES_KEY,
     PARTICIPANT_KEY,
     PREFFERED_ARGS_KEY,
     PROMPT_KEY,
@@ -22,6 +24,7 @@ import {
     ROOM_ID_KEY,
 } from "../constants/keys";
 import { CommonTimeExtractor } from "../core/algorithm";
+import { setMeeting } from "../core/googleCalendar";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
@@ -63,14 +66,68 @@ export class ExecuteViewSubmitHandler {
 
         try {
             switch (view.id) {
-                case ModalEnum.CONFIRMATION_MODAL: {
-                    await sendNotification(
-                        this.read,
-                        this.modify,
-                        user,
-                        room,
-                        "> **Meeting scheduled**"
+                case ModalEnum.PICK_MODAL: {
+                    const args = await getData(
+                        readPersistence,
+                        user.id,
+                        PREFFERED_ARGS_KEY
                     );
+
+                    const { participants } = await getData(
+                        readPersistence,
+                        user.id,
+                        PARTICIPANT_KEY
+                    );
+
+                    const preferredDate =
+                        view.state?.["preferredDateBlockId"][
+                            "preferredDateBlockId"
+                        ] || args.preferredDate;
+
+                    const preferredTime =
+                        view.state?.["preferredTimeBlockId"][
+                            "preferredTimeBlockId"
+                        ] || "";
+
+                    const preferredDuration =
+                        view.state?.["preferredDurationBlockId"][
+                            "preferredDurationBlockId"
+                        ] || 30;
+
+                    if (!preferredTime) {
+                        sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Please select a time"
+                        );
+                    }
+
+                    const startTime = new Date(
+                        `${preferredDate}T${preferredTime}Z`
+                    );
+                    const endTime = new Date(
+                        startTime.getTime() + preferredDuration * 60000
+                    );
+
+                    setMeeting(
+                        this.app,
+                        this.http,
+                        user,
+                        participants,
+                        startTime.toISOString(),
+                        endTime.toISOString()
+                    ).then((res) => {
+                        sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            `Meeting scheduled: ${JSON.stringify(res)}`
+                        );
+                    });
+
                     break;
                 }
                 case ModalEnum.PROMPT_MODAL: {
@@ -138,6 +195,12 @@ export class ExecuteViewSubmitHandler {
                             ).then((res) => {
                                 const extractor = new CommonTimeExtractor(res);
                                 extractor.extract();
+                                storeData(
+                                    this.persistence,
+                                    user.id,
+                                    COMMON_TIMES_KEY,
+                                    extractor.getResultInDateTime()
+                                );
 
                                 sendNotification(
                                     this.read,
@@ -164,6 +227,22 @@ export class ExecuteViewSubmitHandler {
                                             res
                                         )}`
                                     );
+
+                                    getMeetingArguments(
+                                        this.app,
+                                        this.http,
+                                        res
+                                    ).then((res) => {
+                                        sendNotification(
+                                            this.read,
+                                            this.modify,
+                                            user,
+                                            room,
+                                            `Meeting arguments: ${JSON.stringify(
+                                                res
+                                            )}`
+                                        );
+                                    });
                                 });
                             });
                         })
@@ -186,6 +265,12 @@ export class ExecuteViewSubmitHandler {
                         PROMPT_KEY
                     );
 
+                    const { participants } = await getData(
+                        readPersistence,
+                        user.id,
+                        PARTICIPANT_KEY
+                    );
+
                     if (!prompt) {
                         await sendNotification(
                             this.read,
@@ -201,19 +286,6 @@ export class ExecuteViewSubmitHandler {
                         };
                     }
 
-                    const { count } = await getData(
-                        readPersistence,
-                        user.id,
-                        RETRY_COUNT_KEY
-                    );
-
-                    await storeData(
-                        this.persistence,
-                        user.id,
-                        RETRY_COUNT_KEY,
-                        { count: count + 1 }
-                    );
-
                     const args = await getData(
                         readPersistence,
                         user.id,
@@ -222,16 +294,16 @@ export class ExecuteViewSubmitHandler {
 
                     const newArgs: IConstraintArgs = {
                         preferredDate:
-                            view.state?.["preferenceDateBlockId"][
-                                "preferenceDateBlockId"
+                            view.state?.["preferredDateBlockId"][
+                                "preferredDateBlockId"
                             ] || args.preferredDate,
                         timeMin:
-                            view.state?.["preferenceTimeMinBlockId"][
-                                "preferenceTimeMinBlockId"
+                            view.state?.["preferredTimeMinBlockId"][
+                                "preferredTimeMinBlockId"
                             ] || args.timeMin,
                         timeMax:
-                            view.state?.["preferenceTimeMaxBlockId"][
-                                "preferenceTimeMaxBlockId"
+                            view.state?.["preferredTimeMaxBlockId"][
+                                "preferredTimeMaxBlockId"
                             ] || args.timeMax,
                     };
 
@@ -242,7 +314,67 @@ export class ExecuteViewSubmitHandler {
                         newArgs
                     );
 
-                    // TODO: retrigger algorithm
+                    generatePromptForAlgorithm(
+                        this.app,
+                        this.http,
+                        user,
+                        participants,
+                        newArgs
+                    )
+                        .then((res) => {
+                            const extractor = new CommonTimeExtractor(res);
+                            extractor.extract();
+                            storeData(
+                                this.persistence,
+                                user.id,
+                                COMMON_TIMES_KEY,
+                                extractor.getResultInDateTime()
+                            );
+
+                            sendNotification(
+                                this.read,
+                                this.modify,
+                                user,
+                                room,
+                                `Common time: ${JSON.stringify(
+                                    extractor.getResultInDateTime()
+                                )}`
+                            );
+
+                            getRecommendedTime(
+                                this.app,
+                                this.http,
+                                prompt,
+                                extractor.getResultInDateTime()
+                            ).then((res) => {
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `Recommended time prompt: ${JSON.stringify(
+                                        res
+                                    )}`
+                                );
+
+                                getMeetingArguments(
+                                    this.app,
+                                    this.http,
+                                    res
+                                ).then((res) => {
+                                    sendNotification(
+                                        this.read,
+                                        this.modify,
+                                        user,
+                                        room,
+                                        `Meeting arguments: ${JSON.stringify(
+                                            res
+                                        )}`
+                                    );
+                                });
+                            });
+                        })
+                        .catch((e) => this.app.getLogger().error(e));
                 }
             }
 

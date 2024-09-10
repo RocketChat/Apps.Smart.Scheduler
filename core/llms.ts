@@ -143,12 +143,7 @@ export async function getConstraintArguments(
 export async function getMeetingArguments(
     app: SmartSchedulingApp,
     http: IHttp,
-    prompt: string,
-    // DEBUG
-    user: IUser,
-    read: any,
-    modify: any,
-    room: any
+    prompt: string
 ): Promise<IMeetingArgs> {
     const body = {
         messages: [
@@ -171,15 +166,6 @@ export async function getMeetingArguments(
 
     const response = await generateChatCompletions(app, http, body);
     const args: IMeetingArgs = JSON.parse(response);
-
-    // DEBUG
-    await sendNotification(
-        read,
-        modify,
-        user,
-        room,
-        `> Generated meeting arguments: ${JSON.stringify(args)}\n`
-    );
 
     return args;
 }
@@ -272,14 +258,14 @@ export async function getRecommendedTime(
     app: SmartSchedulingApp,
     http: IHttp,
     prompt: string,
-    commonTime: ICommonTimeString[]
+    commonTimes: ICommonTimeString[]
 ): Promise<string> {
     let commonTimePrompt = "";
-    commonTime.forEach((ctime, index) => {
+    commonTimes.forEach((commonTime, index) => {
         commonTimePrompt += `${
             index + 1
-        }. Participants: ${ctime.participants.join(", ")}
-        Time: ${ctime.time[0]} to ${ctime.time[1]}
+        }. Participants: ${commonTime.participants.join(", ")}
+        Time: ${commonTime.time[0]} to ${commonTime.time[1]}
         ----------------`;
     });
 
