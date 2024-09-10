@@ -10,15 +10,16 @@ import { IUIKitModalViewParam } from "@rocket.chat/apps-engine/definition/uikit/
 import { TextObjectType } from "@rocket.chat/apps-engine/definition/uikit/blocks";
 import { ModalEnum } from "../constants/enums";
 import { ROOM_ID_KEY } from "../constants/keys";
-import { IConstraintArgs } from "../definitions/IConstraintArgs";
+import { ICommonTimeString } from "../definitions/ICommonTime";
 import { getData, storeData } from "../lib/dataStore";
 
-export async function retryModal({
+export async function pickModal({
     modify,
     read,
     persistence,
     http,
-    preferredArgs,
+    preferredDate,
+    availableTimes,
     slashCommandContext,
     uiKitContext,
 }: {
@@ -26,7 +27,8 @@ export async function retryModal({
     read: IRead;
     persistence: IPersistence;
     http: IHttp;
-    preferredArgs: IConstraintArgs;
+    preferredDate: string;
+    availableTimes: ICommonTimeString[];
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
 }): Promise<IUIKitModalViewParam> {
@@ -53,16 +55,8 @@ export async function retryModal({
     const blocks = modify.getCreator().getBlockBuilder();
 
     blocks.addSectionBlock({
-        blockId: "guideBlockId",
         text: blocks.newMarkdownTextObject(
-            `
-            Here's your current preference:
-            - **Preferred date**: ${preferredArgs.preferredDate}
-            - **Preferred time**: ${preferredArgs.timeMin} - ${preferredArgs.timeMax}
-
-            If you want to change your preferred, please update the fields below. 
-            Otherwise, leave them as is and click the "Schedule" button.
-            `
+            `Assuming all participants should join, what time would you like to schedule the meeting?`
         ),
     });
 
@@ -75,44 +69,61 @@ export async function retryModal({
         element: blocks.newPlainTextInputElement({
             actionId: "preferredDateBlockId",
             placeholder: {
-                text: `${preferredArgs.preferredDate}`,
+                text: `${preferredDate}`,
                 type: TextObjectType.PLAINTEXT,
             },
         }),
     });
 
     blocks.addInputBlock({
-        blockId: "preferredTimeMinBlockId",
+        blockId: "preferredTimeBlockId",
         label: {
-            text: "Preferred start time:",
+            text: "Preferred time:",
             type: TextObjectType.PLAINTEXT,
         },
-        element: blocks.newPlainTextInputElement({
-            actionId: "preferredTimeMinBlockId",
+        element: blocks.newStaticSelectElement({
+            actionId: "preferredTimeBlockId",
             placeholder: {
-                text: `${preferredArgs.timeMin}`,
+                text: "Select a time",
                 type: TextObjectType.PLAINTEXT,
             },
+            options: availableTimes.map((commonTime) => ({
+                text: {
+                    text: `${commonTime.time[0]
+                        .split("T")[1]
+                        .replace(".000Z", "")}`,
+                    type: TextObjectType.PLAINTEXT,
+                },
+                value: commonTime.time[0].split("T")[1].replace(".000Z", ""),
+            })),
         }),
     });
 
+    const durationOptions = [15, 30, 45, 60, 90, 120];
     blocks.addInputBlock({
-        blockId: "preferredTimeMaxBlockId",
+        blockId: "preferredDurationBlockId",
         label: {
-            text: "Preferred end time:",
+            text: "Preferred duration:",
             type: TextObjectType.PLAINTEXT,
         },
-        element: blocks.newPlainTextInputElement({
-            actionId: "preferredTimeMaxBlockId",
+        element: blocks.newStaticSelectElement({
+            actionId: "preferredDurationBlockId",
             placeholder: {
-                text: `${preferredArgs.timeMax}`,
+                text: "Select a duration",
                 type: TextObjectType.PLAINTEXT,
             },
+            options: durationOptions.map((duration) => ({
+                text: {
+                    text: `${duration} minutes`,
+                    type: TextObjectType.PLAINTEXT,
+                },
+                value: duration.toString(),
+            })),
         }),
     });
 
     return {
-        id: ModalEnum.RETRY_MODAL,
+        id: ModalEnum.PICK_MODAL,
         title: blocks.newPlainTextObject("Schedule your meeting"),
         submit: blocks.newButtonElement({
             text: blocks.newPlainTextObject("Schedule"),

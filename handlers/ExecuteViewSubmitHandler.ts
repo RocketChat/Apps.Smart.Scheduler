@@ -9,26 +9,27 @@ import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/defi
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { ModalEnum } from "../constants/enums";
 import {
-    generateCommonTime,
     generateConstraintPrompt,
-    generateConstraintPromptHelper,
     generatePromptForAlgorithm,
     getMeetingArguments,
+    getRecommendedTime,
 } from "../core/llms";
-import { confirmationModal } from "../modals/confirmationModal";
 // import { generateChatCompletions } from "../core/llms";
 import {
+    COMMON_TIMES_KEY,
+    MEETING_ARGS_KEY,
     PARTICIPANT_KEY,
     PREFFERED_ARGS_KEY,
     PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
-    SCHEDULE_ARGS_KEY,
 } from "../constants/keys";
 import { CommonTimeExtractor } from "../core/algorithm";
+import { setMeeting } from "../core/googleCalendar";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
+import { confirmationBlock } from "../modals/confirmationBlock";
 
 export class ExecuteViewSubmitHandler {
     constructor(
@@ -67,14 +68,75 @@ export class ExecuteViewSubmitHandler {
 
         try {
             switch (view.id) {
-                case ModalEnum.CONFIRMATION_MODAL: {
-                    await sendNotification(
-                        this.read,
-                        this.modify,
-                        user,
-                        room,
-                        "> **Meeting scheduled**"
+                case ModalEnum.PICK_MODAL: {
+                    const args = await getData(
+                        readPersistence,
+                        user.id,
+                        PREFFERED_ARGS_KEY
                     );
+
+                    const { meetingSummary } = await getData(
+                        readPersistence,
+                        user.id,
+                        MEETING_ARGS_KEY
+                    );
+
+                    const { participants } = await getData(
+                        readPersistence,
+                        user.id,
+                        PARTICIPANT_KEY
+                    );
+
+                    const preferredDate =
+                        view.state?.["preferredDateBlockId"][
+                            "preferredDateBlockId"
+                        ] || args.preferredDate;
+
+                    const preferredTime =
+                        view.state?.["preferredTimeBlockId"][
+                            "preferredTimeBlockId"
+                        ] || "";
+
+                    const preferredDuration =
+                        view.state?.["preferredDurationBlockId"][
+                            "preferredDurationBlockId"
+                        ] || 30;
+
+                    if (!preferredTime) {
+                        sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Please select a time"
+                        );
+                    }
+
+                    const startTime = new Date(
+                        `${preferredDate}T${preferredTime}Z`
+                    );
+                    const endTime = new Date(
+                        startTime.getTime() + preferredDuration * 60000
+                    );
+
+                    setMeeting(
+                        this.app,
+                        this.http,
+                        user,
+                        participants,
+                        startTime.toISOString(),
+                        endTime.toISOString(),
+                        meetingSummary
+                    ).then(() => {
+                        sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
+                        );
+                    });
+
                     break;
                 }
                 case ModalEnum.PROMPT_MODAL: {
@@ -111,7 +173,7 @@ export class ExecuteViewSubmitHandler {
                         { count: 1 }
                     );
 
-                    // TODO: Validate user input: prompt injection, 0 participants, etc.
+                    // TODO: Validate user input
                     if (!prompt || !participants) {
                         sendNotification(
                             this.read,
@@ -126,37 +188,70 @@ export class ExecuteViewSubmitHandler {
                         this.app,
                         this.http,
                         user,
-                        participants,
                         prompt,
-                        this.persistence,
-                        this.read,
-                        this.modify,
-                        room
+                        this.persistence
                     )
-                        .then((res) =>
-                            generateCommonTime(this.app, this.http, res).then(
-                                (res) => {
-                                    return getMeetingArguments(
-                                        this.app,
-                                        this.http,
-                                        res,
-                                        user,
+                        .then((res) => {
+                            generatePromptForAlgorithm(
+                                this.app,
+                                this.http,
+                                user,
+                                participants,
+                                res
+                            ).then((res) => {
+                                const extractor = new CommonTimeExtractor(res);
+                                extractor.extract();
+                                storeData(
+                                    this.persistence,
+                                    user.id,
+                                    COMMON_TIMES_KEY,
+                                    extractor.getResultInDateTime()
+                                );
+
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `Common time: ${JSON.stringify(
+                                        extractor.getResultInDateTime()
+                                    )}`
+                                );
+
+                                getRecommendedTime(
+                                    this.app,
+                                    this.http,
+                                    prompt,
+                                    extractor.getResultInDateTime()
+                                ).then((res) => {
+                                    sendNotification(
                                         this.read,
                                         this.modify,
-                                        room
+                                        user,
+                                        room,
+                                        `Recommended time prompt: ${JSON.stringify(
+                                            res
+                                        )}`
+                                    );
+
+                                    getMeetingArguments(
+                                        this.app,
+                                        this.http,
+                                        res
                                     ).then((res) => {
-                                        const blocks = confirmationModal({
+                                        storeData(
+                                            this.persistence,
+                                            user.id,
+                                            MEETING_ARGS_KEY,
+                                            res
+                                        );
+
+                                        const blocks = confirmationBlock({
                                             modify: this.modify,
                                             read: this.read,
                                             persistence: this.persistence,
                                             http: this.http,
-                                            uiKitContext: context,
-                                            useRetry: false,
-                                            summary: `Participants: ${participants}
-                                            Args: 
-                                            - Start time: ${res.datetimeStart}
-                                            - End time: ${res.datetimeEnd}
-                                        `,
+                                            summary: res,
                                         });
 
                                         sendNotification(
@@ -164,15 +259,13 @@ export class ExecuteViewSubmitHandler {
                                             this.modify,
                                             user,
                                             room,
-                                            "Schedule your meeting. Use `/schedule retry` if you are not satisfied.",
+                                            "Schedule the meeting",
                                             blocks
                                         );
-
-                                        return res;
                                     });
-                                }
-                            )
-                        )
+                                });
+                            });
+                        })
                         .catch((e) => this.app.getLogger().error(e));
 
                     break;
@@ -192,6 +285,12 @@ export class ExecuteViewSubmitHandler {
                         PROMPT_KEY
                     );
 
+                    const { participants } = await getData(
+                        readPersistence,
+                        user.id,
+                        PARTICIPANT_KEY
+                    );
+
                     if (!prompt) {
                         await sendNotification(
                             this.read,
@@ -207,25 +306,6 @@ export class ExecuteViewSubmitHandler {
                         };
                     }
 
-                    const { participants } = await getData(
-                        readPersistence,
-                        user.id,
-                        PARTICIPANT_KEY
-                    );
-
-                    const { count } = await getData(
-                        readPersistence,
-                        user.id,
-                        RETRY_COUNT_KEY
-                    );
-
-                    await storeData(
-                        this.persistence,
-                        user.id,
-                        RETRY_COUNT_KEY,
-                        { count: count + 1 }
-                    );
-
                     const args = await getData(
                         readPersistence,
                         user.id,
@@ -234,16 +314,16 @@ export class ExecuteViewSubmitHandler {
 
                     const newArgs: IConstraintArgs = {
                         preferredDate:
-                            view.state?.["preferenceDateBlockId"][
-                                "preferenceDateBlockId"
+                            view.state?.["preferredDateBlockId"][
+                                "preferredDateBlockId"
                             ] || args.preferredDate,
                         timeMin:
-                            view.state?.["preferenceTimeMinBlockId"][
-                                "preferenceTimeMinBlockId"
+                            view.state?.["preferredTimeMinBlockId"][
+                                "preferredTimeMinBlockId"
                             ] || args.timeMin,
                         timeMax:
-                            view.state?.["preferenceTimeMaxBlockId"][
-                                "preferenceTimeMaxBlockId"
+                            view.state?.["preferredTimeMaxBlockId"][
+                                "preferredTimeMaxBlockId"
                             ] || args.timeMax,
                     };
 
@@ -254,132 +334,71 @@ export class ExecuteViewSubmitHandler {
                         newArgs
                     );
 
-                    const algorithm =
-                        view.state?.["algorithmBlockId"]["algorithmBlockId"] ||
-                        "llm";
-
-                    switch (algorithm) {
-                        case "llm": {
-                            generateConstraintPromptHelper(
-                                this.app,
-                                this.http,
-                                user,
-                                participants,
-                                newArgs
-                            )
-                                .then((res) => {
-                                    generateCommonTime(
-                                        this.app,
-                                        this.http,
-                                        res
-                                    ).then((res) => {
-                                        return getMeetingArguments(
-                                            this.app,
-                                            this.http,
-                                            res,
-                                            user,
-                                            this.read,
-                                            this.modify,
-                                            room
-                                        ).then((res) => {
-                                            const blocks = confirmationModal({
-                                                modify: this.modify,
-                                                read: this.read,
-                                                persistence: this.persistence,
-                                                http: this.http,
-                                                uiKitContext: context,
-                                                useRetry: false,
-                                                summary: `Participants: ${participants}
-                                                Args: 
-                                                - Start time: ${res.datetimeStart}
-                                                - End time: ${res.datetimeEnd}
-                                                `,
-                                            });
-
-                                            sendNotification(
-                                                this.read,
-                                                this.modify,
-                                                user,
-                                                room,
-                                                "Schedule your meeting",
-                                                blocks
-                                            );
-
-                                            return res;
-                                        });
-                                    });
-                                })
-                                .catch((e) => this.app.getLogger().error(e));
-
-                            break;
-                        }
-                        case "algorithm": {
-                            await sendNotification(
-                                this.read,
-                                this.modify,
-                                user,
-                                room,
-                                "Algorithm is running..."
+                    generatePromptForAlgorithm(
+                        this.app,
+                        this.http,
+                        user,
+                        participants,
+                        newArgs
+                    )
+                        .then((res) => {
+                            const extractor = new CommonTimeExtractor(res);
+                            extractor.extract();
+                            storeData(
+                                this.persistence,
+                                user.id,
+                                COMMON_TIMES_KEY,
+                                extractor.getResultInDateTime()
                             );
 
-                            generatePromptForAlgorithm(
+                            getRecommendedTime(
                                 this.app,
                                 this.http,
-                                user,
-                                participants,
-                                newArgs
+                                prompt,
+                                extractor.getResultInDateTime()
                             ).then((res) => {
                                 sendNotification(
                                     this.read,
                                     this.modify,
                                     user,
                                     room,
-                                    `> ${res}`
+                                    `Recommended time prompt: ${JSON.stringify(
+                                        res
+                                    )}`
                                 );
 
-                                const extractor = new CommonTimeExtractor(res);
-                                extractor.extract();
-                                const commonTime =
-                                    extractor.getResultInDateTime();
+                                getMeetingArguments(
+                                    this.app,
+                                    this.http,
+                                    res
+                                ).then((res) => {
+                                    storeData(
+                                        this.persistence,
+                                        user.id,
+                                        MEETING_ARGS_KEY,
+                                        res
+                                    );
 
-                                // TODO: make AI choose which time to use
-                                // For now: hard code take the first common time
+                                    const blocks = confirmationBlock({
+                                        modify: this.modify,
+                                        read: this.read,
+                                        persistence: this.persistence,
+                                        http: this.http,
+                                        summary: res,
+                                    });
 
-                                const blocks = confirmationModal({
-                                    modify: this.modify,
-                                    read: this.read,
-                                    persistence: this.persistence,
-                                    http: this.http,
-                                    uiKitContext: context,
-                                    useRetry: false,
-                                    summary: `Participants: ${commonTime[0].participants}
-                                    Args: 
-                                    - Start time: ${commonTime[0].time[0]}
-                                    - End time: ${commonTime[0].time[1]}`,
+                                    sendNotification(
+                                        this.read,
+                                        this.modify,
+                                        user,
+                                        room,
+                                        "Schedule the meeting",
+                                        blocks
+                                    );
                                 });
-
-                                storeData(
-                                    this.persistence,
-                                    user.id,
-                                    SCHEDULE_ARGS_KEY,
-                                    commonTime[0]
-                                );
-
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    "Schedule your meeting",
-                                    blocks
-                                );
                             });
-
-                            break;
-                        }
-                    }
-
-                    break;
+                        })
+                        .catch((e) => this.app.getLogger().error(e));
                 }
             }
 

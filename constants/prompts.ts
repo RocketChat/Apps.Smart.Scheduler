@@ -11,10 +11,11 @@ Use this list to determine the preferred date. First item refers to tomorrow. Se
 
 # Guide to answer Q2
 - People usually start working at 09:00 and end at 18:00.
-- Early slot is usually before lunch (09:00-12:00). 
+- "Early slot" is before lunch (09:00-12:00). 
 - Anything that says "morning" is before lunch (09.00-12.00).
 - Lunch break is at 13:00, so "post-lunch" is 13.00-18.00.
 - Anything with "afternoon" is after lunch (13:00-18:00). If people say "early afternoon," it means 13:00-15:00. If it is "late afternoon," then it is 15:00-18:00.
+- No meeting before 9:00 or after 18:00.
 
 # Examples
 Here are the examples that you can use to answer the questions.
@@ -68,13 +69,41 @@ Q1: 2024-05-06
 Q2: Late afternoon (15:00-16:00)
 `;
 
-export const COMMON_TIME_PROMPT = `
-You are a scheduling assistant who will help a group of people to find suitable meeting time for them. The definitions of free time are
-1. Time between busy schedule, 
-2. Office hour start to the first busy schedule, or 
-3. Last busy schedule to end of office hours.
+export const RECOMMENDED_COMMON_TIME_PROMPT = `
+You are a helpful assistant who will help people to find the best time to meet. We find several common times for participants to meet. 
 
+Context:
+{prompt}
+1. What is the topic of the meeting? 
+
+Based on the context, choose one of the common times below.
+{common_time}
+Determine the following: 
+1. The participants who can attend the meeting,
+2. The time that is suitable for all participants, and
+3. The duration of the meeting. Do not exceed max durations.
+
+Answer it concisely.
+`;
+
+export const CONSTRAINT_ARGS_PROMPT = `
 Based on this prompt:
 {prompt}
-What is their common free time? 
+Extract the following arguments:
+{
+    "preferredDate": "2021-12-31", // YYYY-MM-DD
+    "timeMin": "09:00:00", // HH:MM:SS
+    "timeMax": "17:00:00", // HH:MM:SS
+}`;
+
+export const MEETING_ARGS_PROMPT = `
+Based on this prompt:
+{prompt}
+Extract the following arguments:
+{
+    "meetingSummary": "string", // Topic of the meeting  
+    "participants": ["email@example.com", "second.email@example.com"], // Array of emails
+    "datetimeStart": "2021-12-31T09:00:00Z", // Meeting start. Use ISO 8601 format
+    "datetimeEnd": "2021-12-31T17:00:00Z", // Meeting end. Use ISO 8601 format
+}
 `;

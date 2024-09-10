@@ -10,8 +10,9 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { IExecutorProps } from "../definitions/IExecutorProps";
 
-import { PREFFERED_ARGS_KEY } from "../constants/keys";
+import { COMMON_TIMES_KEY, PREFFERED_ARGS_KEY } from "../constants/keys";
 import { authorize } from "../modals/authModal";
+import { pickModal } from "../modals/pickModal";
 import { promptModal } from "../modals/promptModal";
 import { retryModal } from "../modals/retryModal";
 import { getData } from "./dataStore";
@@ -67,7 +68,47 @@ export class CommandUtility {
                     read: this.read,
                     persistence: this.persistence,
                     http: this.http,
-                    preferenceArgs: args,
+                    preferredArgs: args,
+                    slashCommandContext: this.context,
+                    uiKitContext: undefined,
+                });
+
+                await this.modify
+                    .getUiController()
+                    .openModalView(modal, { triggerId }, user);
+            } else if (command === "pick") {
+                const triggerId = this.context.getTriggerId() as string;
+                const user = this.context.getSender();
+                const args = await getData(
+                    this.read.getPersistenceReader(),
+                    user.id,
+                    PREFFERED_ARGS_KEY
+                );
+
+                const availableTimes = await getData(
+                    this.read.getPersistenceReader(),
+                    user.id,
+                    COMMON_TIMES_KEY
+                );
+
+                if (!availableTimes) {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        this.sender,
+                        this.room,
+                        "No common times available. Trigger `/schedule` first."
+                    );
+                    return;
+                }
+
+                const modal = await pickModal({
+                    modify: this.modify,
+                    read: this.read,
+                    persistence: this.persistence,
+                    http: this.http,
+                    preferredDate: args.preferredDate,
+                    availableTimes: availableTimes,
                     slashCommandContext: this.context,
                     uiKitContext: undefined,
                 });
@@ -76,7 +117,18 @@ export class CommandUtility {
                     .getUiController()
                     .openModalView(modal, { triggerId }, user);
             } else if (command === "help") {
-                // TODO: Implement help command
+                sendNotification(
+                    this.read,
+                    this.modify,
+                    this.sender,
+                    this.room,
+                    `Available commands:
+                - \`/schedule\` to schedule a meeting.
+                - \`/schedule authorize\` to authorize the app.
+                - \`/schedule retry\` to retry the scheduling.
+                - \`/schedule pick\` to pick a common time.
+                - \`/schedule help\` to see this message.`
+                );
             } else {
                 await sendNotification(
                     this.read,

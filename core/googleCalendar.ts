@@ -37,7 +37,8 @@ export async function setMeeting(
     user: IUser,
     emails: string[],
     timeStart: string,
-    timeEnd: string
+    timeEnd: string,
+    meetingSummary: string
 ): Promise<object> {
     const accessToken = await app
         .getOauth2ClientInstance()
@@ -52,7 +53,8 @@ export async function setMeeting(
         http,
         emails,
         timeStart,
-        timeEnd
+        timeEnd,
+        meetingSummary
     );
 
     return response;
