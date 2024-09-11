@@ -107,3 +107,51 @@ Extract the following arguments:
     "datetimeEnd": "2021-12-31T17:00:00Z", // Meeting end. Use ISO 8601 format
 }
 `;
+
+export const ASK_FUNCTION_CALL_PROMPT = `
+[AVAILABLE_TOOLS] 
+[
+    {
+        "type": "function", 
+        "function": {
+            "name": "getPeopleSchedule", 
+            "description": "Call the Google Calendar API to check the schedule of the people", 
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "usernames": {
+                        "type": "array", 
+                        "items": {
+                            "type": "string",
+                            "description": "The username of the people to check the schedule"
+                        }
+                    },
+                    "date": {
+                        "type": "string", 
+                        "description": "The date to check the schedule"
+                    },
+                }, 
+                "required": [
+                    "usernames", 
+                    "date"
+                ]
+            }
+        }
+    }
+]
+[/AVAILABLE_TOOLS]
+[INST]
+Based on this prompt:
+{prompt}
+Determine which function to call and provide the arguments. Use the following format:
+{
+    "functionName": <function_name>,
+    "arguments": {
+        <argument_name>: <argument_value>,
+        <argument_name>: <argument_value>    
+    }
+}
+If you need information about date, use the following list. First item refers to tomorrow. Second item refers to the day after tomorrow. It goes so on and so forth.
+{days}
+[/INST]
+`;

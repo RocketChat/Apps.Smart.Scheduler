@@ -5,6 +5,7 @@ import {
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { COMMON_TIMES_KEY, PREFFERED_ARGS_KEY } from "../constants/keys";
 import {
+    ASK_FUNCTION_CALL_PROMPT,
     CONSTRAINT_ARGS_PROMPT,
     MEETING_ARGS_PROMPT,
     RECOMMENDED_COMMON_TIME_PROMPT,
@@ -16,6 +17,7 @@ import {
 import { ICommonTimeString } from "../definitions/ICommonTime";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
+import { IFunctionCall } from "../definitions/IFunctionCall";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
 import { storeData } from "../lib/dataStore";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
@@ -72,7 +74,9 @@ export async function generateChatCompletions(
         // return JSON.parse(response.content).choices[0].message.content;
     } catch (error) {
         app.getLogger().error(`Error parsing response: ${error}`);
-        throw new Error(`Invalid response from API: ${response}`);
+        throw new Error(
+            `Invalid response from API: ${JSON.stringify(response)}`
+        );
     }
 }
 
@@ -255,4 +259,28 @@ export async function getMeetingArguments(
     const args: IMeetingArgs = JSON.parse(response);
 
     return args;
+}
+
+export async function getFunction(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    user: IUser,
+    prompt: string
+): Promise<IFunctionCall> {
+    const body = {
+        raw: true,
+        messages: [
+            {
+                role: "system",
+                content: constructPreferredDateTimePrompt(
+                    user.utcOffset,
+                    prompt,
+                    ASK_FUNCTION_CALL_PROMPT
+                ),
+            },
+        ],
+    };
+
+    const response = await generateChatCompletions(app, http, body);
+    return JSON.parse(response) as IFunctionCall;
 }

@@ -6,7 +6,8 @@ import { getFormattedDate, timeToUTC } from "../lib/dateUtils";
 
 export function constructPreferredDateTimePrompt(
     utcOffset: number,
-    prompt: string
+    prompt: string,
+    base_prompt: string = PREFERRED_DATETIME_PROMPT
 ): string {
     const processedPrompt = `Given today is ${getFormattedDate(
         utcOffset
@@ -23,22 +24,25 @@ export function constructPreferredDateTimePrompt(
         })}`;
     }).join("\n");
 
-    return PREFERRED_DATETIME_PROMPT.replace(
-        "{prompt}",
-        processedPrompt
-    ).replace("{days}", days);
+    return base_prompt
+        .replace("{prompt}", processedPrompt)
+        .replace("{days}", days);
 }
 
 export function constructSchedule(
     preferredDate: string,
     response: IFreeBusyResponse,
-    utcOffsets: number[]
+    utcOffsets: number[],
+    usernames?: string[]
 ): string {
     let prompt = "";
 
     const calendars = Object.keys(response.calendars);
     calendars.forEach((calendar, index) => {
-        prompt += `\n${calendar}\n`;
+        prompt += `\n${
+            usernames ? "Schedule for " + usernames[index] + " / " : ""
+        }${calendar}\n`;
+
         const busy = response.calendars[calendar].busy;
         if (busy.length !== 0) {
             busy.forEach((time) => {

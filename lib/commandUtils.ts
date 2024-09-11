@@ -15,6 +15,8 @@ import {
     MEETING_ARGS_KEY,
     PREFFERED_ARGS_KEY,
 } from "../constants/keys";
+import { functionsMap } from "../core/functionCall";
+import { getFunction } from "../core/llms";
 import { authorize } from "../modals/authModal";
 import { pickModal } from "../modals/pickModal";
 import { promptModal } from "../modals/promptModal";
@@ -153,13 +155,28 @@ export class CommandUtility {
             if (this.command[0] === "ask") {
                 const question = this.command.slice(1).join(" ");
 
-                // TODO: process question
-                await sendNotification(
-                    this.read,
-                    this.modify,
-                    this.sender,
-                    this.room,
-                    question
+                const members = await this.read
+                    .getRoomReader()
+                    .getMembers(this.room.id);
+
+                getFunction(this.app, this.http, this.sender, question).then(
+                    (res) => {
+                        functionsMap[res.functionName]({
+                            app: this.app,
+                            http: this.http,
+                            user: this.sender,
+                            ...res.arguments,
+                            roomMembers: members,
+                        }).then((res) => {
+                            sendNotification(
+                                this.read,
+                                this.modify,
+                                this.sender,
+                                this.room,
+                                res
+                            );
+                        });
+                    }
                 );
             } else {
                 const triggerId = this.context.getTriggerId() as string;
