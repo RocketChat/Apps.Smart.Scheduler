@@ -56,7 +56,7 @@ export async function promptModal({
                         type: TextObjectType.MARKDOWN,
                         text: `${member.name} - @${member.username} - ${member.emails[0].address}`,
                     },
-                    value: member.emails[0].address,
+                    value: `${member.emails[0].address} | ${member.utcOffset}`,
                 });
             }
         }

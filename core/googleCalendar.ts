@@ -3,7 +3,7 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { checkAvailability, createEvent } from "../lib/googleCalendarSDK";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
-export async function getConstraints(
+export async function getFreeBusySchedule(
     app: SmartSchedulingApp,
     http: IHttp,
     user: IUser,
@@ -23,7 +23,7 @@ export async function getConstraints(
     const response = await checkAvailability(
         accessToken.token,
         http,
-        [user.emails[0].address, ...emails],
+        emails,
         timeMin.toISOString(),
         timeMax.toISOString()
     );

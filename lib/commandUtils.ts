@@ -10,7 +10,11 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { IExecutorProps } from "../definitions/IExecutorProps";
 
-import { COMMON_TIMES_KEY, PREFFERED_ARGS_KEY } from "../constants/keys";
+import {
+    COMMON_TIMES_KEY,
+    MEETING_ARGS_KEY,
+    PREFFERED_ARGS_KEY,
+} from "../constants/keys";
 import { authorize } from "../modals/authModal";
 import { pickModal } from "../modals/pickModal";
 import { promptModal } from "../modals/promptModal";
@@ -91,6 +95,12 @@ export class CommandUtility {
                     COMMON_TIMES_KEY
                 );
 
+                const { meetingSummary } = await getData(
+                    this.read.getPersistenceReader(),
+                    user.id,
+                    MEETING_ARGS_KEY
+                );
+
                 if (!availableTimes) {
                     await sendNotification(
                         this.read,
@@ -109,6 +119,7 @@ export class CommandUtility {
                     http: this.http,
                     preferredDate: args.preferredDate,
                     availableTimes: availableTimes,
+                    meetingSummary: meetingSummary,
                     slashCommandContext: this.context,
                     uiKitContext: undefined,
                 });
@@ -139,21 +150,34 @@ export class CommandUtility {
                 );
             }
         } else {
-            const triggerId = this.context.getTriggerId() as string;
-            const user = this.context.getSender();
+            if (this.command[0] === "ask") {
+                const question = this.command.slice(1).join(" ");
 
-            const modal = await promptModal({
-                modify: this.modify,
-                read: this.read,
-                persistence: this.persistence,
-                http: this.http,
-                slashCommandContext: this.context,
-                uiKitContext: undefined,
-            });
+                // TODO: process question
+                await sendNotification(
+                    this.read,
+                    this.modify,
+                    this.sender,
+                    this.room,
+                    question
+                );
+            } else {
+                const triggerId = this.context.getTriggerId() as string;
+                const user = this.context.getSender();
 
-            await this.modify
-                .getUiController()
-                .openModalView(modal, { triggerId }, user);
+                const modal = await promptModal({
+                    modify: this.modify,
+                    read: this.read,
+                    persistence: this.persistence,
+                    http: this.http,
+                    slashCommandContext: this.context,
+                    uiKitContext: undefined,
+                });
+
+                await this.modify
+                    .getUiController()
+                    .openModalView(modal, { triggerId }, user);
+            }
         }
     }
 }

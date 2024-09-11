@@ -29,10 +29,42 @@ export function constructPreferredDateTimePrompt(
     ).replace("{days}", days);
 }
 
+export function constructSchedule(
+    preferredDate: string,
+    response: IFreeBusyResponse,
+    utcOffsets: number[]
+): string {
+    let prompt = "";
+
+    const calendars = Object.keys(response.calendars);
+    calendars.forEach((calendar, index) => {
+        prompt += `\n${calendar}\n`;
+        const busy = response.calendars[calendar].busy;
+        if (busy.length !== 0) {
+            busy.forEach((time) => {
+                prompt += `- Busy from ${time.start} to ${time.end}\n`;
+            });
+        }
+
+        const startTime = timeToUTC(
+            preferredDate,
+            "09:00:00",
+            utcOffsets[index]
+        );
+
+        const endTime = timeToUTC(preferredDate, "17:00:00", utcOffsets[index]);
+
+        prompt += `- Office hours from ${startTime} to ${endTime}\n`;
+    });
+
+    return prompt;
+}
+
 export function constructFreeBusyPrompt(
     args: IConstraintArgs,
     user: IUser,
-    response: IFreeBusyResponse
+    response: IFreeBusyResponse,
+    utcOffsets: number[]
 ): string {
     const dateTimeMin = timeToUTC(
         args.preferredDate,
@@ -45,20 +77,10 @@ export function constructFreeBusyPrompt(
         user.utcOffset
     );
 
-    const calendars = Object.keys(response.calendars);
     let prompt = `General Constraint
     - Preferable from ${dateTimeMin}Z to ${dateTimeMax}Z\n`;
 
-    calendars.forEach((calendar) => {
-        prompt += `\n${calendar}\n`;
-        const busy = response.calendars[calendar].busy;
-        if (busy.length !== 0) {
-            busy.forEach((time) => {
-                prompt += `- Busy from ${time.start} to ${time.end}\n`;
-            });
-        }
-        prompt += `- Office hours from ${args.preferredDate}T01:00:00Z to ${args.preferredDate}T09:00:00Z\n`; // TODO: Hardcoded office hours
-    });
+    prompt += constructSchedule(args.preferredDate, response, utcOffsets);
 
     return prompt;
 }

@@ -10,13 +10,12 @@ import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { ModalEnum } from "../constants/enums";
 import {
     generateConstraintPrompt,
-    generatePromptForAlgorithm,
+    getCommonTimeInString,
     getMeetingArguments,
     getRecommendedTime,
 } from "../core/llms";
 // import { generateChatCompletions } from "../core/llms";
 import {
-    COMMON_TIMES_KEY,
     MEETING_ARGS_KEY,
     PARTICIPANT_KEY,
     PREFFERED_ARGS_KEY,
@@ -24,7 +23,6 @@ import {
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
 } from "../constants/keys";
-import { CommonTimeExtractor } from "../core/algorithm";
 import { setMeeting } from "../core/googleCalendar";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
@@ -75,6 +73,21 @@ export class ExecuteViewSubmitHandler {
                         PREFFERED_ARGS_KEY
                     );
 
+                    if (!args) {
+                        await sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            `Trigger \`\\schedule\` first`
+                        );
+
+                        return {
+                            success: false,
+                            error: "No preference found",
+                        };
+                    }
+
                     const { meetingSummary } = await getData(
                         readPersistence,
                         user.id,
@@ -87,10 +100,30 @@ export class ExecuteViewSubmitHandler {
                         PARTICIPANT_KEY
                     );
 
+                    const meetingTopic =
+                        view.state?.["meetingSummaryBlockId"][
+                            "meetingSummaryBlockId"
+                        ] || meetingSummary;
+
                     const preferredDate =
                         view.state?.["preferredDateBlockId"][
                             "preferredDateBlockId"
                         ] || args.preferredDate;
+
+                    if (!preferredDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        await sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Date must be in YYYY-MM-DD format"
+                        );
+
+                        return {
+                            success: false,
+                            error: "Invalid date format",
+                        };
+                    }
 
                     const preferredTime =
                         view.state?.["preferredTimeBlockId"][
@@ -126,7 +159,7 @@ export class ExecuteViewSubmitHandler {
                         participants,
                         startTime.toISOString(),
                         endTime.toISOString(),
-                        meetingSummary
+                        meetingTopic
                     ).then(() => {
                         sendNotification(
                             this.read,
@@ -187,42 +220,24 @@ export class ExecuteViewSubmitHandler {
                     generateConstraintPrompt(
                         this.app,
                         this.http,
+                        this.persistence,
                         user,
-                        prompt,
-                        this.persistence
+                        prompt
                     )
                         .then((res) => {
-                            generatePromptForAlgorithm(
+                            getCommonTimeInString(
                                 this.app,
                                 this.http,
+                                this.persistence,
                                 user,
                                 participants,
                                 res
                             ).then((res) => {
-                                const extractor = new CommonTimeExtractor(res);
-                                extractor.extract();
-                                storeData(
-                                    this.persistence,
-                                    user.id,
-                                    COMMON_TIMES_KEY,
-                                    extractor.getResultInDateTime()
-                                );
-
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    `Common time: ${JSON.stringify(
-                                        extractor.getResultInDateTime()
-                                    )}`
-                                );
-
                                 getRecommendedTime(
                                     this.app,
                                     this.http,
                                     prompt,
-                                    extractor.getResultInDateTime()
+                                    res
                                 ).then((res) => {
                                     sendNotification(
                                         this.read,
@@ -239,6 +254,16 @@ export class ExecuteViewSubmitHandler {
                                         this.http,
                                         res
                                     ).then((res) => {
+                                        sendNotification(
+                                            this.read,
+                                            this.modify,
+                                            user,
+                                            room,
+                                            `Meeting arguments: ${JSON.stringify(
+                                                res
+                                            )}`
+                                        );
+
                                         storeData(
                                             this.persistence,
                                             user.id,
@@ -327,6 +352,39 @@ export class ExecuteViewSubmitHandler {
                             ] || args.timeMax,
                     };
 
+                    if (!newArgs.preferredDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        await sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Date must be in YYYY-MM-DD format"
+                        );
+
+                        return {
+                            success: false,
+                            error: "Invalid date format",
+                        };
+                    }
+
+                    if (
+                        !newArgs.timeMin.match(/^\d{2}:\d{2}:\d{2}$/) ||
+                        !newArgs.timeMax.match(/^\d{2}:\d{2}:\d{2}$/)
+                    ) {
+                        await sendNotification(
+                            this.read,
+                            this.modify,
+                            user,
+                            room,
+                            "Time must be in HH:MM:SS format"
+                        );
+
+                        return {
+                            success: false,
+                            error: "Invalid time format",
+                        };
+                    }
+
                     await storeData(
                         this.persistence,
                         user.id,
@@ -334,28 +392,20 @@ export class ExecuteViewSubmitHandler {
                         newArgs
                     );
 
-                    generatePromptForAlgorithm(
+                    getCommonTimeInString(
                         this.app,
                         this.http,
+                        this.persistence,
                         user,
                         participants,
                         newArgs
                     )
                         .then((res) => {
-                            const extractor = new CommonTimeExtractor(res);
-                            extractor.extract();
-                            storeData(
-                                this.persistence,
-                                user.id,
-                                COMMON_TIMES_KEY,
-                                extractor.getResultInDateTime()
-                            );
-
                             getRecommendedTime(
                                 this.app,
                                 this.http,
                                 prompt,
-                                extractor.getResultInDateTime()
+                                res
                             ).then((res) => {
                                 sendNotification(
                                     this.read,

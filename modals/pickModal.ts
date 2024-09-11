@@ -20,6 +20,7 @@ export async function pickModal({
     http,
     preferredDate,
     availableTimes,
+    meetingSummary,
     slashCommandContext,
     uiKitContext,
 }: {
@@ -29,6 +30,7 @@ export async function pickModal({
     http: IHttp;
     preferredDate: string;
     availableTimes: ICommonTimeString[];
+    meetingSummary: string;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
 }): Promise<IUIKitModalViewParam> {
@@ -58,6 +60,21 @@ export async function pickModal({
         text: blocks.newMarkdownTextObject(
             `Assuming all participants should join, what time would you like to schedule the meeting?`
         ),
+    });
+
+    blocks.addInputBlock({
+        blockId: "meetingSummaryBlockId",
+        label: {
+            text: "Meeting topic:",
+            type: TextObjectType.PLAINTEXT,
+        },
+        element: blocks.newPlainTextInputElement({
+            actionId: "meetingSummaryBlockId",
+            placeholder: {
+                text: `${meetingSummary}`,
+                type: TextObjectType.PLAINTEXT,
+            },
+        }),
     });
 
     blocks.addInputBlock({

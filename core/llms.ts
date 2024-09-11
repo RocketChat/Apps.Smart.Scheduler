@@ -3,7 +3,7 @@ import {
     IPersistence,
 } from "@rocket.chat/apps-engine/definition/accessors";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
-import { PREFFERED_ARGS_KEY } from "../constants/keys";
+import { COMMON_TIMES_KEY, PREFFERED_ARGS_KEY } from "../constants/keys";
 import {
     CONSTRAINT_ARGS_PROMPT,
     MEETING_ARGS_PROMPT,
@@ -19,7 +19,8 @@ import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
 import { storeData } from "../lib/dataStore";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
-import { getConstraints } from "./googleCalendar";
+import { CommonTimeExtractor } from "./algorithm";
+import { getFreeBusySchedule } from "./googleCalendar";
 
 export async function generateChatCompletions(
     app: SmartSchedulingApp,
@@ -94,25 +95,6 @@ export async function generatePreferredDateTime(
     return response;
 }
 
-export async function generateCommonTime(
-    app: SmartSchedulingApp,
-    http: IHttp,
-    constraintPrompt: string
-): Promise<string> {
-    // return `2024-09-09T02:30:00Z to 2024-09-09T03:00:00Z`;
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: constraintPrompt,
-            },
-        ],
-    };
-
-    const response = await generateChatCompletions(app, http, body);
-    return response;
-}
-
 export async function getConstraintArguments(
     app: SmartSchedulingApp,
     http: IHttp,
@@ -136,9 +118,9 @@ export async function getConstraintArguments(
 export async function generateConstraintPrompt(
     app: SmartSchedulingApp,
     http: IHttp,
+    persistence: IPersistence,
     user: IUser,
-    prompt: string,
-    persistence: IPersistence
+    prompt: string
 ): Promise<IConstraintArgs> {
     const preferredDateTime = await generatePreferredDateTime(
         app,
@@ -158,10 +140,21 @@ export async function generatePromptForAlgorithm(
     app: SmartSchedulingApp,
     http: IHttp,
     user: IUser,
-    emails: string[],
+    participants: string[],
     args: IConstraintArgs
 ): Promise<string> {
-    const constraints = (await getConstraints(
+    let modifiedParticipants = [
+        user.emails[0].address + "|" + user.utcOffset,
+        ...participants,
+    ];
+    const emails = modifiedParticipants.map(
+        (participant) => participant.split("|")[0]
+    );
+    const utcOffsets = modifiedParticipants.map((participant) =>
+        parseInt(participant.split("|")[1])
+    );
+
+    const constraints = (await getFreeBusySchedule(
         app,
         http,
         user,
@@ -169,8 +162,43 @@ export async function generatePromptForAlgorithm(
         args.preferredDate
     ).then((res) => res)) as IFreeBusyResponse;
 
-    const constraintPrompt = constructFreeBusyPrompt(args, user, constraints);
+    const constraintPrompt = constructFreeBusyPrompt(
+        args,
+        user,
+        constraints,
+        utcOffsets
+    );
+
     return constraintPrompt;
+}
+
+export async function getCommonTimeInString(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    persistence: IPersistence,
+    user: IUser,
+    participants: string[],
+    args: IConstraintArgs
+) {
+    const prompt = await generatePromptForAlgorithm(
+        app,
+        http,
+        user,
+        participants,
+        args
+    );
+
+    const extractor = new CommonTimeExtractor(prompt);
+    extractor.extract();
+
+    await storeData(
+        persistence,
+        user.id,
+        COMMON_TIMES_KEY,
+        extractor.getResultInDateTime()
+    );
+
+    return extractor.getResultInDateTime();
 }
 
 export async function getRecommendedTime(
