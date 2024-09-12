@@ -114,6 +114,7 @@ export function constructReminderPrompt(
     ${prompt}
     And this preference
     - Date: ${args.preferredDate}
+    - Time: ${args.timeMin} to ${args.timeMax}
     - Participants: ${emails}
     - Duration: 15 minutes
     `;

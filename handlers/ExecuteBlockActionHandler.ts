@@ -70,7 +70,8 @@ export class ExecuteBlockActionHandler {
                         this.modify,
                         user,
                         room,
-                        "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
+                        `Event is scheduled :white_check_mark: 
+                        Please check your calendar :calendar: `
                     );
                 });
 

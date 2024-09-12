@@ -166,6 +166,10 @@ export class CommandUtility {
                     > If you are not satisfied with the suggested time, you can retry the scheduling by using the command \`/schedule retry\`.
                     > However, if you are still not satisfied with the suggested time, you can pick a common time by using the command \`/schedule pick\`.
                     
+                    _3. Create a reminders._
+                    > To create a reminder, use the command \`/schedule\`. Use keyword "remind" in the prompt.
+                    > You can not use retry or pick command for reminders.
+
                     *Command summary*:                
                     - \`/schedule\` to schedule a meeting.
                     - \`/schedule authorize\` to authorize the app for Google Calendar access.

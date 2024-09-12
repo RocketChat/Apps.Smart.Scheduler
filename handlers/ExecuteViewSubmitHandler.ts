@@ -27,6 +27,7 @@ import {
 import { constructReminderPrompt } from "../core/prompts";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
+import { offsetTime } from "../lib/dateUtils";
 import { sendNotification } from "../lib/messages";
 import { confirmationBlock } from "../modals/confirmationBlock";
 
@@ -153,11 +154,15 @@ export class ExecuteViewSubmitHandler {
                         startTime.getTime() + preferredDuration * 60000
                     );
 
+                    const emails = participants.map((person) =>
+                        person.split("|")[0].trim()
+                    );
+
                     setMeeting(
                         this.app,
                         this.http,
                         user,
-                        participants,
+                        [user.emails[0].address, ...emails],
                         startTime.toISOString(),
                         endTime.toISOString(),
                         meetingTopic
@@ -167,7 +172,8 @@ export class ExecuteViewSubmitHandler {
                             this.modify,
                             user,
                             room,
-                            "Meeting is scheduled :white_check_mark: . Please check your calendar :calendar: "
+                            `Event is scheduled :white_check_mark: 
+                            Please check your calendar :calendar: `
                         );
                     });
 
@@ -257,13 +263,35 @@ export class ExecuteViewSubmitHandler {
                                         res.meetingSummary ||
                                         "Reminders from Rocket.Chat";
 
+                                    res.datetimeStart = offsetTime(
+                                        res.datetimeStart.split("T")[0],
+                                        res.datetimeStart
+                                            .split("T")[1]
+                                            .replace("Z", ""),
+                                        user.utcOffset
+                                    );
+                                    res.datetimeEnd = offsetTime(
+                                        res.datetimeEnd.split("T")[0],
+                                        res.datetimeEnd
+                                            .split("T")[1]
+                                            .replace("Z", ""),
+                                        user.utcOffset
+                                    );
+
+                                    storeData(
+                                        this.persistence,
+                                        user.id,
+                                        MEETING_ARGS_KEY,
+                                        res
+                                    );
+
                                     const blocks = confirmationBlock({
                                         modify: this.modify,
                                         read: this.read,
                                         persistence: this.persistence,
                                         http: this.http,
                                         summary: res,
-                                        userOffset: 0,
+                                        userOffset: user.utcOffset,
                                     });
 
                                     sendNotification(
