@@ -26,7 +26,7 @@ export const getFormattedDate = (utcOffset: number): string => {
     return dateToString(date);
 };
 
-export const timeToUTC = (
+export const offsetTime = (
     date: string,
     time: string,
     utcOffset: number

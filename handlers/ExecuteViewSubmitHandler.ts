@@ -9,13 +9,6 @@ import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/defi
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { ModalEnum } from "../constants/enums";
 import {
-    generateConstraintPrompt,
-    getCommonTimeInString,
-    getMeetingArguments,
-    getRecommendedTime,
-} from "../core/llms";
-// import { generateChatCompletions } from "../core/llms";
-import {
     MEETING_ARGS_KEY,
     PARTICIPANT_KEY,
     PREFFERED_ARGS_KEY,
@@ -24,8 +17,15 @@ import {
     ROOM_ID_KEY,
 } from "../constants/keys";
 import { setMeeting } from "../core/googleCalendar";
+import {
+    generateConstraintPrompt,
+    getCommonTimeInString,
+    getMeetingArguments,
+    getRecommendedTime,
+} from "../core/llms";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
+import { offsetTime } from "../lib/dateUtils";
 import { sendNotification } from "../lib/messages";
 import { confirmationBlock } from "../modals/confirmationBlock";
 
@@ -178,7 +178,7 @@ export class ExecuteViewSubmitHandler {
                         this.modify,
                         user,
                         room,
-                        `AI is thinking, it may take a while. Please wait... :clock12:`
+                        `AI is thinking, it may take a while... :clock12:`
                     );
 
                     const prompt =
@@ -233,6 +233,14 @@ export class ExecuteViewSubmitHandler {
                                 participants,
                                 res
                             ).then((res) => {
+                                sendNotification(
+                                    this.read,
+                                    this.modify,
+                                    user,
+                                    room,
+                                    `I just got your preference. Please wait...`
+                                );
+
                                 getRecommendedTime(
                                     this.app,
                                     this.http,
@@ -244,9 +252,7 @@ export class ExecuteViewSubmitHandler {
                                         this.modify,
                                         user,
                                         room,
-                                        `Recommended time prompt: ${JSON.stringify(
-                                            res
-                                        )}`
+                                        `Just a little more... ;)`
                                     );
 
                                     getMeetingArguments(
@@ -254,21 +260,26 @@ export class ExecuteViewSubmitHandler {
                                         this.http,
                                         res
                                     ).then((res) => {
-                                        sendNotification(
-                                            this.read,
-                                            this.modify,
-                                            user,
-                                            room,
-                                            `Meeting arguments: ${JSON.stringify(
-                                                res
-                                            )}`
-                                        );
-
                                         storeData(
                                             this.persistence,
                                             user.id,
                                             MEETING_ARGS_KEY,
                                             res
+                                        );
+
+                                        res.datetimeStart = offsetTime(
+                                            res.datetimeStart.split("T")[0],
+                                            res.datetimeStart
+                                                .split("T")[1]
+                                                .replace("Z", ""),
+                                            -user.utcOffset
+                                        );
+                                        res.datetimeEnd = offsetTime(
+                                            res.datetimeEnd.split("T")[0],
+                                            res.datetimeEnd
+                                                .split("T")[1]
+                                                .replace("Z", ""),
+                                            -user.utcOffset
                                         );
 
                                         const blocks = confirmationBlock({
@@ -412,9 +423,7 @@ export class ExecuteViewSubmitHandler {
                                     this.modify,
                                     user,
                                     room,
-                                    `Recommended time prompt: ${JSON.stringify(
-                                        res
-                                    )}`
+                                    `Just a little more... ;)`
                                 );
 
                                 getMeetingArguments(
@@ -427,6 +436,21 @@ export class ExecuteViewSubmitHandler {
                                         user.id,
                                         MEETING_ARGS_KEY,
                                         res
+                                    );
+
+                                    res.datetimeStart = offsetTime(
+                                        res.datetimeStart.split("T")[0],
+                                        res.datetimeStart
+                                            .split("T")[1]
+                                            .replace("Z", ""),
+                                        -user.utcOffset
+                                    );
+                                    res.datetimeEnd = offsetTime(
+                                        res.datetimeEnd.split("T")[0],
+                                        res.datetimeEnd
+                                            .split("T")[1]
+                                            .replace("Z", ""),
+                                        -user.utcOffset
                                     );
 
                                     const blocks = confirmationBlock({

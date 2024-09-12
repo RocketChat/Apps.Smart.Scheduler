@@ -1,7 +1,7 @@
 import { IHttp } from "@rocket.chat/apps-engine/definition/accessors";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
-import { formatDateToYYYYMMDD } from "../lib/dateUtils";
+import { formatDateToYYYYMMDD, offsetTime } from "../lib/dateUtils";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { getFreeBusySchedule } from "./googleCalendar";
 import { constructSchedule } from "./prompts";
@@ -40,7 +40,7 @@ export const functionsMap = {
         const offsets = validPeople.map((person) => person.offset);
         const modifiedDate = formatDateToYYYYMMDD(date);
 
-        const constraints = (await getFreeBusySchedule(
+        let constraints = (await getFreeBusySchedule(
             app,
             http,
             user,
@@ -48,12 +48,31 @@ export const functionsMap = {
             modifiedDate
         ).then((res) => res)) as IFreeBusyResponse;
 
+        for (const calendar in constraints.calendars) {
+            const busy = constraints.calendars[calendar].busy;
+            constraints.calendars[calendar].busy = busy.map((time) => {
+                return {
+                    start: offsetTime(
+                        time.start.split("T")[0],
+                        time.start.split("T")[1].replace("Z", ""),
+                        -user.utcOffset
+                    ),
+                    end: offsetTime(
+                        time.end.split("T")[0],
+                        time.end.split("T")[1].replace("Z", ""),
+                        -user.utcOffset
+                    ),
+                };
+            });
+        }
+
         const prompt = constructSchedule(
             modifiedDate,
             constraints,
             offsets,
-            usernames
+            usernames,
+            false
         );
-        return `Here is the schedule for ${date}: ${prompt}`;
+        return `Here is the schedule for ${date} in your local time: ${prompt}`;
     },
 };

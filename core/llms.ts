@@ -151,8 +151,8 @@ export async function generatePromptForAlgorithm(
         user.emails[0].address + "|" + user.utcOffset,
         ...participants,
     ];
-    const emails = modifiedParticipants.map(
-        (participant) => participant.split("|")[0]
+    const emails = modifiedParticipants.map((participant) =>
+        participant.split("|")[0].trim()
     );
     const utcOffsets = modifiedParticipants.map((participant) =>
         parseInt(participant.split("|")[1])
@@ -183,7 +183,7 @@ export async function getCommonTimeInString(
     user: IUser,
     participants: string[],
     args: IConstraintArgs
-) {
+): Promise<any> {
     const prompt = await generatePromptForAlgorithm(
         app,
         http,
@@ -279,6 +279,7 @@ export async function getFunction(
                 ),
             },
         ],
+        format: "json",
     };
 
     const response = await generateChatCompletions(app, http, body);

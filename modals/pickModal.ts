@@ -12,6 +12,7 @@ import { ModalEnum } from "../constants/enums";
 import { ROOM_ID_KEY } from "../constants/keys";
 import { ICommonTimeString } from "../definitions/ICommonTime";
 import { getData, storeData } from "../lib/dataStore";
+import { offsetTime } from "../lib/dateUtils";
 
 export async function pickModal({
     modify,
@@ -21,6 +22,7 @@ export async function pickModal({
     preferredDate,
     availableTimes,
     meetingSummary,
+    userOffset,
     slashCommandContext,
     uiKitContext,
 }: {
@@ -31,6 +33,7 @@ export async function pickModal({
     preferredDate: string;
     availableTimes: ICommonTimeString[];
     meetingSummary: string;
+    userOffset: number;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
 }): Promise<IUIKitModalViewParam> {
@@ -106,9 +109,15 @@ export async function pickModal({
             },
             options: availableTimes.map((commonTime) => ({
                 text: {
-                    text: `${commonTime.time[0]
-                        .split("T")[1]
-                        .replace(".000Z", "")}`,
+                    text: `${
+                        offsetTime(
+                            commonTime.time[0].split("T")[0],
+                            commonTime.time[0]
+                                .split("T")[1]
+                                .replace(".000Z", ""),
+                            -userOffset
+                        ).split("T")[1]
+                    }`,
                     type: TextObjectType.PLAINTEXT,
                 },
                 value: commonTime.time[0].split("T")[1].replace(".000Z", ""),
@@ -126,7 +135,7 @@ export async function pickModal({
         element: blocks.newStaticSelectElement({
             actionId: "preferredDurationBlockId",
             placeholder: {
-                text: "Select a duration",
+                text: "30 minutes",
                 type: TextObjectType.PLAINTEXT,
             },
             options: durationOptions.map((duration) => ({

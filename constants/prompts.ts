@@ -79,11 +79,11 @@ Context:
 Based on the context, choose one of the common times below.
 {common_time}
 Determine the following: 
-1. The participants who can attend the meeting,
-2. The time that is suitable for all participants, and
-3. The duration of the meeting. Do not exceed max durations.
+2. The email participants who can attend the meeting,
+3. The time that is suitable for all participants, and
+4. The duration of the meeting. Do not exceed max durations.
 
-Answer it concisely.
+No need reasoning. Just answer as concise as possible.
 `;
 
 export const CONSTRAINT_ARGS_PROMPT = `

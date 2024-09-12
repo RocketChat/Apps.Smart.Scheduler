@@ -124,6 +124,7 @@ export class CommandUtility {
                     meetingSummary: meetingSummary,
                     slashCommandContext: this.context,
                     uiKitContext: undefined,
+                    userOffset: this.sender.utcOffset,
                 });
 
                 await this.modify
@@ -135,12 +136,27 @@ export class CommandUtility {
                     this.modify,
                     this.sender,
                     this.room,
-                    `Available commands:
-                - \`/schedule\` to schedule a meeting.
-                - \`/schedule authorize\` to authorize the app.
-                - \`/schedule retry\` to retry the scheduling.
-                - \`/schedule pick\` to pick a common time.
-                - \`/schedule help\` to see this message.`
+                    `How to use the Smart Scheduling App
+                    *Pre-requisites*: 
+                    - You need to authorize the app to access your calendar. Use the command \`/schedule authorize\` to authorize the app.
+
+                    *Usage*:
+                    _1. Ask the AI about the schedule._
+                    > To ask the AI about the schedule, use the command \`/schedule ask <question>\`. For example, \`/schedule ask What is @username for tomorrow?\`.
+
+                    _2. Schedule a meeting._
+                    > To schedule a meeting, use the command \`/schedule\`. The app will ask you for the meeting details.
+                    > If you are not satisfied with the suggested time, you can retry the scheduling by using the command \`/schedule retry\`.
+                    > However, if you are still not satisfied with the suggested time, you can pick a common time by using the command \`/schedule pick\`.
+                    
+                    *Command summary*:                
+                    - \`/schedule\` to schedule a meeting.
+                    - \`/schedule authorize\` to authorize the app for Google Calendar access.
+                    - \`/schedule ask <question>\` to ask the AI about the schedule.
+                    - \`/schedule retry\` to retry the scheduling.
+                    - \`/schedule pick\` to pick a common time.
+                    - \`/schedule help\` to see this message.
+                `
                 );
             } else {
                 await sendNotification(
@@ -154,6 +170,14 @@ export class CommandUtility {
         } else {
             if (this.command[0] === "ask") {
                 const question = this.command.slice(1).join(" ");
+
+                sendNotification(
+                    this.read,
+                    this.modify,
+                    this.sender,
+                    this.room,
+                    `_Your question was: ${question}_`
+                );
 
                 const members = await this.read
                     .getRoomReader()

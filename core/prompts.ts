@@ -2,7 +2,7 @@ import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { PREFERRED_DATETIME_PROMPT } from "../constants/prompts";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
-import { getFormattedDate, timeToUTC } from "../lib/dateUtils";
+import { getFormattedDate, offsetTime } from "../lib/dateUtils";
 
 export function constructPreferredDateTimePrompt(
     utcOffset: number,
@@ -33,7 +33,8 @@ export function constructSchedule(
     preferredDate: string,
     response: IFreeBusyResponse,
     utcOffsets: number[],
-    usernames?: string[]
+    usernames?: string[],
+    officeHours: boolean = true
 ): string {
     let prompt = "";
 
@@ -50,15 +51,21 @@ export function constructSchedule(
             });
         }
 
-        const startTime = timeToUTC(
+        const startTime = offsetTime(
             preferredDate,
             "09:00:00",
             utcOffsets[index]
         );
 
-        const endTime = timeToUTC(preferredDate, "17:00:00", utcOffsets[index]);
+        const endTime = offsetTime(
+            preferredDate,
+            "17:00:00",
+            utcOffsets[index]
+        );
 
-        prompt += `- Office hours from ${startTime} to ${endTime}\n`;
+        if (officeHours) {
+            prompt += `- Office hours from ${startTime} to ${endTime}\n`;
+        }
     });
 
     return prompt;
@@ -70,12 +77,12 @@ export function constructFreeBusyPrompt(
     response: IFreeBusyResponse,
     utcOffsets: number[]
 ): string {
-    const dateTimeMin = timeToUTC(
+    const dateTimeMin = offsetTime(
         args.preferredDate,
         args.timeMin,
         user.utcOffset
     );
-    const dateTimeMax = timeToUTC(
+    const dateTimeMax = offsetTime(
         args.preferredDate,
         args.timeMax,
         user.utcOffset
