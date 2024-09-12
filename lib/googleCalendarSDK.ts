@@ -66,7 +66,10 @@ export async function createEvent(
     );
 
     if (!response || response.statusCode !== 200) {
-        throw new Error("There was an error while creating the event. ");
+        throw new Error(
+            "There was an error while creating the event. Response: " +
+                JSON.stringify(response)
+        );
     }
 
     return JSON.parse(response.content || "{}");

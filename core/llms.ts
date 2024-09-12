@@ -285,3 +285,4 @@ export async function getFunction(
     const response = await generateChatCompletions(app, http, body);
     return JSON.parse(response) as IFunctionCall;
 }
+

@@ -13,6 +13,7 @@ import {
     PARTICIPANT_KEY,
     PREFFERED_ARGS_KEY,
     PROMPT_KEY,
+    RETRIABLE_PROMPT_KEY,
     RETRY_COUNT_KEY,
     ROOM_ID_KEY,
 } from "../constants/keys";
@@ -23,9 +24,9 @@ import {
     getMeetingArguments,
     getRecommendedTime,
 } from "../core/llms";
+import { constructReminderPrompt } from "../core/prompts";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
-import { offsetTime } from "../lib/dateUtils";
 import { sendNotification } from "../lib/messages";
 import { confirmationBlock } from "../modals/confirmationBlock";
 
@@ -206,8 +207,7 @@ export class ExecuteViewSubmitHandler {
                         { count: 1 }
                     );
 
-                    // TODO: Validate user input
-                    if (!prompt || !participants) {
+                    if (!prompt) {
                         sendNotification(
                             this.read,
                             this.modify,
@@ -225,82 +225,119 @@ export class ExecuteViewSubmitHandler {
                         prompt
                     )
                         .then((res) => {
-                            getCommonTimeInString(
-                                this.app,
-                                this.http,
-                                this.persistence,
+                            sendNotification(
+                                this.read,
+                                this.modify,
                                 user,
-                                participants,
-                                res
-                            ).then((res) => {
-                                sendNotification(
-                                    this.read,
-                                    this.modify,
-                                    user,
-                                    room,
-                                    `I just got your preference. Please wait...`
+                                room,
+                                `I just got your preference. Please wait...`
+                            );
+
+                            if (prompt.toLocaleLowerCase().includes("remind")) {
+                                storeData(
+                                    this.persistence,
+                                    user.id,
+                                    RETRIABLE_PROMPT_KEY,
+                                    { retriable: false }
                                 );
 
-                                getRecommendedTime(
+                                const reminderPrompt = constructReminderPrompt(
+                                    user,
+                                    prompt,
+                                    participants,
+                                    res
+                                );
+
+                                getMeetingArguments(
                                     this.app,
                                     this.http,
-                                    prompt,
-                                    res
+                                    reminderPrompt
                                 ).then((res) => {
+                                    res.meetingSummary =
+                                        res.meetingSummary ||
+                                        "Reminders from Rocket.Chat";
+
+                                    const blocks = confirmationBlock({
+                                        modify: this.modify,
+                                        read: this.read,
+                                        persistence: this.persistence,
+                                        http: this.http,
+                                        summary: res,
+                                        userOffset: 0,
+                                    });
+
                                     sendNotification(
                                         this.read,
                                         this.modify,
                                         user,
                                         room,
-                                        `Just a little more... ;)`
+                                        "Reminder of the meeting",
+                                        blocks
                                     );
+                                });
+                            } else {
+                                storeData(
+                                    this.persistence,
+                                    user.id,
+                                    RETRIABLE_PROMPT_KEY,
+                                    { retriable: true }
+                                );
 
-                                    getMeetingArguments(
+                                getCommonTimeInString(
+                                    this.app,
+                                    this.http,
+                                    this.persistence,
+                                    user,
+                                    participants,
+                                    res
+                                ).then((res) => {
+                                    getRecommendedTime(
                                         this.app,
                                         this.http,
+                                        prompt,
                                         res
                                     ).then((res) => {
-                                        storeData(
-                                            this.persistence,
-                                            user.id,
-                                            MEETING_ARGS_KEY,
-                                            res
-                                        );
-
-                                        res.datetimeStart = offsetTime(
-                                            res.datetimeStart.split("T")[0],
-                                            res.datetimeStart
-                                                .split("T")[1]
-                                                .replace("Z", ""),
-                                            -user.utcOffset
-                                        );
-                                        res.datetimeEnd = offsetTime(
-                                            res.datetimeEnd.split("T")[0],
-                                            res.datetimeEnd
-                                                .split("T")[1]
-                                                .replace("Z", ""),
-                                            -user.utcOffset
-                                        );
-
-                                        const blocks = confirmationBlock({
-                                            modify: this.modify,
-                                            read: this.read,
-                                            persistence: this.persistence,
-                                            http: this.http,
-                                            summary: res,
-                                        });
-
                                         sendNotification(
                                             this.read,
                                             this.modify,
                                             user,
                                             room,
-                                            "Schedule the meeting",
-                                            blocks
+                                            `Just a little more... ;)`
                                         );
+
+                                        getMeetingArguments(
+                                            this.app,
+                                            this.http,
+                                            res
+                                        ).then((res) => {
+                                            storeData(
+                                                this.persistence,
+                                                user.id,
+                                                MEETING_ARGS_KEY,
+                                                res
+                                            );
+
+                                            const blocks = confirmationBlock({
+                                                modify: this.modify,
+                                                read: this.read,
+                                                persistence: this.persistence,
+                                                http: this.http,
+                                                summary: res,
+                                                userOffset: user.utcOffset,
+                                            });
+
+                                            sendNotification(
+                                                this.read,
+                                                this.modify,
+                                                user,
+                                                room,
+                                                "Schedule the meeting",
+                                                blocks
+                                            );
+                                        });
                                     });
                                 });
-                            });
+                            }
                         })
                         .catch((e) => this.app.getLogger().error(e));
 
@@ -312,7 +349,7 @@ export class ExecuteViewSubmitHandler {
                         this.modify,
                         user,
                         room,
-                        `Retrying...`
+                        `AI is retrying... :robot:`
                     );
 
                     const { prompt } = await getData(
@@ -438,27 +475,13 @@ export class ExecuteViewSubmitHandler {
                                         res
                                     );
 
-                                    res.datetimeStart = offsetTime(
-                                        res.datetimeStart.split("T")[0],
-                                        res.datetimeStart
-                                            .split("T")[1]
-                                            .replace("Z", ""),
-                                        -user.utcOffset
-                                    );
-                                    res.datetimeEnd = offsetTime(
-                                        res.datetimeEnd.split("T")[0],
-                                        res.datetimeEnd
-                                            .split("T")[1]
-                                            .replace("Z", ""),
-                                        -user.utcOffset
-                                    );
-
                                     const blocks = confirmationBlock({
                                         modify: this.modify,
                                         read: this.read,
                                         persistence: this.persistence,
                                         http: this.http,
                                         summary: res,
+                                        userOffset: user.utcOffset,
                                     });
 
                                     sendNotification(

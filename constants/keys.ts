@@ -7,3 +7,4 @@ export const RETRY_COUNT_KEY = "SmartScheduling.RetryCount";
 export const COMMON_TIMES_KEY = "SmartScheduling.CommonTimes";
 export const PREFFERED_ARGS_KEY = "SmartScheduling.PreferredArgs";
 export const MEETING_ARGS_KEY = "SmartScheduling.MeetingArgs";
+export const RETRIABLE_PROMPT_KEY = "SmartScheduling.RetriablePrompt";

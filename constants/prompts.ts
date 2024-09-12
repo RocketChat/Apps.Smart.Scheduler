@@ -10,6 +10,7 @@ Use this list to determine the preferred date. First item refers to tomorrow. Se
 {days}
 
 # Guide to answer Q2
+- If time is specified, answer with the specified time.
 - People usually start working at 09:00 and end at 18:00.
 - "Early slot" is before lunch (09:00-12:00). 
 - Anything that says "morning" is before lunch (09.00-12.00).
@@ -54,11 +55,11 @@ Q2: Early morning (08:00-09:00)
 
 ## Example 5
 Prompt:
-Given today is Tuesday, 2024-09-10. Plan a team lunch with @steve and @nina for next Friday. The lunch should be around midday.
+Given today is Tuesday, 2024-09-10. Plan a team lunch with @steve and @nina for next Friday. The lunch should be from 12.00 to 13.00.
 
 Answers:
 Q1: 2024-09-13
-Q2: Midday (12:00-13:00)
+Q2: Specified (12:00-13:00)
 
 ## Example 6
 Prompt:

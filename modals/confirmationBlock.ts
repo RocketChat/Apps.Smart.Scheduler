@@ -12,6 +12,7 @@ import {
 } from "@rocket.chat/apps-engine/definition/uikit";
 import { UIKitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit/UIKitInteractionContext";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
+import { offsetTime } from "../lib/dateUtils";
 
 export function confirmationBlock({
     modify,
@@ -21,6 +22,7 @@ export function confirmationBlock({
     summary,
     slashCommandContext,
     uiKitContext,
+    userOffset = 7,
     useRetry = false,
 }: {
     modify: IModify;
@@ -30,14 +32,27 @@ export function confirmationBlock({
     summary: IMeetingArgs;
     slashCommandContext?: SlashCommandContext;
     uiKitContext?: UIKitInteractionContext;
+    userOffset?: number;
     useRetry?: boolean;
 }): BlockBuilder {
+    // Preprocess information
+    summary.datetimeStart = offsetTime(
+        summary.datetimeStart.split("T")[0],
+        summary.datetimeStart.split("T")[1].replace("Z", ""),
+        -userOffset
+    );
+    summary.datetimeEnd = offsetTime(
+        summary.datetimeEnd.split("T")[0],
+        summary.datetimeEnd.split("T")[1].replace("Z", ""),
+        -userOffset
+    );
+
     const blocks = modify.getCreator().getBlockBuilder();
     blocks.addSectionBlock({
         blockId: "confirmationBlockId",
         text: blocks.newMarkdownTextObject(
             `*Please confirm the following details:*
-            1. Meeting topic: ${summary.meetingSummary}
+            1. Topic: ${summary.meetingSummary}
             2. Participants: 
                 ${summary.participants
                     .map((participant) => `     - ${participant}`)

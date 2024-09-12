@@ -14,6 +14,7 @@ import {
     COMMON_TIMES_KEY,
     MEETING_ARGS_KEY,
     PREFFERED_ARGS_KEY,
+    RETRIABLE_PROMPT_KEY,
 } from "../constants/keys";
 import { functionsMap } from "../core/functionCall";
 import { getFunction } from "../core/llms";
@@ -61,6 +62,22 @@ export class CommandUtility {
                     this.persistence
                 );
             } else if (command === "retry") {
+                const { retriable } = await getData(
+                    this.read.getPersistenceReader(),
+                    this.sender.id,
+                    RETRIABLE_PROMPT_KEY
+                );
+
+                if (!retriable) {
+                    await sendNotification(
+                        this.read,
+                        this.modify,
+                        this.sender,
+                        this.room,
+                        `Reminder prompt is not retriable :cross:`
+                    );
+                }
+
                 const triggerId = this.context.getTriggerId() as string;
                 const user = this.context.getSender();
                 const args = await getData(
