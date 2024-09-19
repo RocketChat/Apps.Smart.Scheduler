@@ -9,16 +9,10 @@ import {
     IUIKitResponse,
     UIKitBlockInteractionContext,
 } from "@rocket.chat/apps-engine/definition/uikit";
-import {
-    MEETING_ARGS_KEY,
-    PARTICIPANT_KEY,
-    PROMPT_KEY,
-    RETRY_COUNT_KEY,
-    ROOM_ID_KEY,
-} from "../constants/keys";
+import { MEETING_ARGS_KEY, ROOM_ID_KEY } from "../constants/keys";
 import { setMeeting } from "../core/googleCalendar";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
-import { getData, storeData } from "../lib/dataStore";
+import { getData } from "../lib/dataStore";
 import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 
@@ -78,64 +72,6 @@ export class ExecuteBlockActionHandler {
                 return context.getInteractionResponder().successResponse();
             }
             case "Retry": {
-                const { count } = await getData(
-                    readPersistence,
-                    user.id,
-                    RETRY_COUNT_KEY
-                );
-
-                if (count >= 3) {
-                    await sendNotification(
-                        this.read,
-                        this.modify,
-                        user,
-                        room,
-                        "You have reached the maximum number of retries. Trigger `/schedule` to start over."
-                    );
-
-                    return context.getInteractionResponder().successResponse();
-                }
-
-                const { prompt } = await getData(
-                    readPersistence,
-                    user.id,
-                    PROMPT_KEY
-                );
-                const { participants } = await getData(
-                    readPersistence,
-                    user.id,
-                    PARTICIPANT_KEY
-                );
-
-                await storeData(this.persistence, user.id, RETRY_COUNT_KEY, {
-                    count: count + 1,
-                });
-
-                try {
-                    // TODO: Validate user input: prompt injection, 0 participants, etc.
-                    if (!prompt || !participants) {
-                        sendNotification(
-                            this.read,
-                            this.modify,
-                            user,
-                            room,
-                            "Input should not be empty"
-                        );
-                    }
-
-                    // TODO: Implement retry
-
-                    sendNotification(
-                        this.read,
-                        this.modify,
-                        user,
-                        room,
-                        `Retry count: ${count}. Please wait... :clock12:`
-                    );
-                    return context.getInteractionResponder().successResponse();
-                } catch (e) {
-                    return context.getInteractionResponder().errorResponse();
-                }
             }
         }
 

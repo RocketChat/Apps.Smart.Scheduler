@@ -99,17 +99,9 @@ export function constructFreeBusyPrompt(
 export function constructReminderPrompt(
     user: IUser,
     prompt: string,
-    participants: string[],
+    emails: string[],
     args: IConstraintArgs
 ): string {
-    let modifiedParticipants = [
-        user.emails[0].address + "|" + user.utcOffset,
-        ...participants,
-    ];
-    const emails = modifiedParticipants.map((participant) =>
-        participant.split("|")[0].trim()
-    );
-
     const reminderPrompt = `Set a reminder based on this prompt:
     ${prompt}
     And this preference

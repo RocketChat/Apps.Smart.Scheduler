@@ -155,6 +155,7 @@ export class CommandUtility {
                     this.room,
                     `How to use the Smart Scheduling App
                     *Pre-requisites*: 
+                    - Go to the app settings and set your client ID and client secret.
                     - You need to authorize the app to access your calendar. Use the command \`/schedule authorize\` to authorize the app.
 
                     *Usage*:

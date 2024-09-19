@@ -1,7 +1,10 @@
 import {
     IHttp,
+    IModify,
     IPersistence,
+    IRead,
 } from "@rocket.chat/apps-engine/definition/accessors";
+import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { IUser } from "@rocket.chat/apps-engine/definition/users";
 import { COMMON_TIMES_KEY, PREFFERED_ARGS_KEY } from "../constants/keys";
 import {
@@ -13,6 +16,7 @@ import {
 import {
     constructFreeBusyPrompt,
     constructPreferredDateTimePrompt,
+    constructReminderPrompt,
 } from "../core/prompts";
 import { ICommonTimeString } from "../definitions/ICommonTime";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
@@ -20,6 +24,7 @@ import { IFreeBusyResponse } from "../definitions/IFreeBusyResponse";
 import { IFunctionCall } from "../definitions/IFunctionCall";
 import { IMeetingArgs } from "../definitions/IMeetingArgs";
 import { storeData } from "../lib/dataStore";
+import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { CommonTimeExtractor } from "./algorithm";
 import { getFreeBusySchedule } from "./googleCalendar";
@@ -205,41 +210,6 @@ export async function getCommonTimeInString(
     return extractor.getResultInDateTime();
 }
 
-export async function getRecommendedTime(
-    app: SmartSchedulingApp,
-    http: IHttp,
-    prompt: string,
-    commonTimes: ICommonTimeString[]
-): Promise<string> {
-    let commonTimePrompt = "";
-    commonTimes.forEach((commonTime, index) => {
-        commonTimePrompt += `${
-            index + 1
-        }. Participants: ${commonTime.participants.join(", ")}
-        Time: ${commonTime.time[0]} to ${commonTime.time[1]}
-        Max duration: ${
-            new Date(commonTime.time[1]).getMinutes() -
-            new Date(commonTime.time[0]).getMinutes()
-        } minutes
-        ----------------`;
-    });
-
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
-                    "{prompt}",
-                    prompt
-                ).replace("{common_time}", commonTimePrompt),
-            },
-        ],
-    };
-
-    const response = await generateChatCompletions(app, http, body);
-    return response;
-}
-
 export async function getMeetingArguments(
     app: SmartSchedulingApp,
     http: IHttp,
@@ -286,3 +256,80 @@ export async function getFunction(
     return JSON.parse(response) as IFunctionCall;
 }
 
+export async function getRecommendedTime(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    prompt: string,
+    commonTimes: ICommonTimeString[],
+    // DEBUG
+    read: IRead,
+    modify: IModify,
+    user: IUser,
+    room: IRoom
+): Promise<IMeetingArgs> {
+    let commonTimePrompt = "";
+    commonTimes.forEach((commonTime, index) => {
+        commonTimePrompt += `${
+            index + 1
+        }. Participants: ${commonTime.participants.join(", ")}
+        Time: ${commonTime.time[0]} to ${commonTime.time[1]}
+        Max duration: ${
+            new Date(commonTime.time[1]).getMinutes() -
+            new Date(commonTime.time[0]).getMinutes()
+        } minutes
+        ----------------`;
+    });
+
+    const body = {
+        messages: [
+            {
+                role: "system",
+                content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
+                    "{prompt}",
+                    prompt
+                ).replace("{common_time}", commonTimePrompt),
+            },
+        ],
+    };
+
+    const response = await generateChatCompletions(app, http, body);
+
+    await sendNotification(
+        this.read,
+        this.modify,
+        user,
+        room,
+        `Just a little more... ;)`
+    );
+
+    const meetingArgs = await getMeetingArguments(app, http, response);
+
+    return meetingArgs;
+}
+
+export async function getReminder(
+    app: SmartSchedulingApp,
+    http: IHttp,
+    user: IUser,
+    participants: string[],
+    prompt: string,
+    constraintArgs: IConstraintArgs
+): Promise<IMeetingArgs> {
+    let modifiedParticipants = [
+        user.emails[0].address + "|" + user.utcOffset,
+        ...participants,
+    ];
+    const emails = modifiedParticipants.map((participant) =>
+        participant.split("|")[0].trim()
+    );
+
+    const reminderPrompt = constructReminderPrompt(
+        user,
+        prompt,
+        emails,
+        constraintArgs
+    );
+
+    const meetingArgs = await getMeetingArguments(app, http, reminderPrompt);
+    return meetingArgs;
+}

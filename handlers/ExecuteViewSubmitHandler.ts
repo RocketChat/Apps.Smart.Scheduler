@@ -21,10 +21,9 @@ import { setMeeting } from "../core/googleCalendar";
 import {
     generateConstraintPrompt,
     getCommonTimeInString,
-    getMeetingArguments,
     getRecommendedTime,
+    getReminder,
 } from "../core/llms";
-import { constructReminderPrompt } from "../core/prompts";
 import { IConstraintArgs } from "../definitions/IConstraintArgs";
 import { getData, storeData } from "../lib/dataStore";
 import { offsetTime } from "../lib/dateUtils";
@@ -247,17 +246,13 @@ export class ExecuteViewSubmitHandler {
                                     { retriable: false }
                                 );
 
-                                const reminderPrompt = constructReminderPrompt(
-                                    user,
-                                    prompt,
-                                    participants,
-                                    res
-                                );
-
-                                getMeetingArguments(
+                                getReminder(
                                     this.app,
                                     this.http,
-                                    reminderPrompt
+                                    user,
+                                    participants,
+                                    prompt,
+                                    res
                                 ).then((res) => {
                                     res.meetingSummary =
                                         res.meetingSummary ||
@@ -323,46 +318,36 @@ export class ExecuteViewSubmitHandler {
                                         this.app,
                                         this.http,
                                         prompt,
-                                        res
+                                        res,
+                                        this.read,
+                                        this.modify,
+                                        user,
+                                        room
                                     ).then((res) => {
+                                        storeData(
+                                            this.persistence,
+                                            user.id,
+                                            MEETING_ARGS_KEY,
+                                            res
+                                        );
+
+                                        const blocks = confirmationBlock({
+                                            modify: this.modify,
+                                            read: this.read,
+                                            persistence: this.persistence,
+                                            http: this.http,
+                                            summary: res,
+                                            userOffset: user.utcOffset,
+                                        });
+
                                         sendNotification(
                                             this.read,
                                             this.modify,
                                             user,
                                             room,
-                                            `Just a little more... ;)`
+                                            "Schedule the meeting",
+                                            blocks
                                         );
-
-                                        getMeetingArguments(
-                                            this.app,
-                                            this.http,
-                                            res
-                                        ).then((res) => {
-                                            storeData(
-                                                this.persistence,
-                                                user.id,
-                                                MEETING_ARGS_KEY,
-                                                res
-                                            );
-
-                                            const blocks = confirmationBlock({
-                                                modify: this.modify,
-                                                read: this.read,
-                                                persistence: this.persistence,
-                                                http: this.http,
-                                                summary: res,
-                                                userOffset: user.utcOffset,
-                                            });
-
-                                            sendNotification(
-                                                this.read,
-                                                this.modify,
-                                                user,
-                                                room,
-                                                "Schedule the meeting",
-                                                blocks
-                                            );
-                                        });
                                     });
                                 });
                             }
@@ -481,46 +466,36 @@ export class ExecuteViewSubmitHandler {
                                 this.app,
                                 this.http,
                                 prompt,
-                                res
+                                res,
+                                this.read,
+                                this.modify,
+                                user,
+                                room
                             ).then((res) => {
+                                storeData(
+                                    this.persistence,
+                                    user.id,
+                                    MEETING_ARGS_KEY,
+                                    res
+                                );
+
+                                const blocks = confirmationBlock({
+                                    modify: this.modify,
+                                    read: this.read,
+                                    persistence: this.persistence,
+                                    http: this.http,
+                                    summary: res,
+                                    userOffset: user.utcOffset,
+                                });
+
                                 sendNotification(
                                     this.read,
                                     this.modify,
                                     user,
                                     room,
-                                    `Just a little more... ;)`
+                                    "Schedule the meeting",
+                                    blocks
                                 );
-
-                                getMeetingArguments(
-                                    this.app,
-                                    this.http,
-                                    res
-                                ).then((res) => {
-                                    storeData(
-                                        this.persistence,
-                                        user.id,
-                                        MEETING_ARGS_KEY,
-                                        res
-                                    );
-
-                                    const blocks = confirmationBlock({
-                                        modify: this.modify,
-                                        read: this.read,
-                                        persistence: this.persistence,
-                                        http: this.http,
-                                        summary: res,
-                                        userOffset: user.utcOffset,
-                                    });
-
-                                    sendNotification(
-                                        this.read,
-                                        this.modify,
-                                        user,
-                                        room,
-                                        "Schedule the meeting",
-                                        blocks
-                                    );
-                                });
                             });
                         })
                         .catch((e) => this.app.getLogger().error(e));
