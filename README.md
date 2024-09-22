@@ -59,7 +59,7 @@ Example prompt: _Remind me 23 September 2024 for a GSOC submission at 09.00_
 <h2 >How to set up 💻</h2>
 
 <ol>
-  <li>Have a Rocket.Chat server ready. If you don't have a server, see this <a href="https://developer.rocket.chat/rocket.chat/rocket-chat-environment-setup">guide</a>.</li> 
+  <li>Have a Rocket.Chat server ready. If you don't have a server, see this <a href="https://docs.rocket.chat/docs/deploy-rocketchat">guide</a>.</li> 
   <li style="margin-bottom: 1rem;">Install the Rocket.Chat Apps Engline CLI. </li>
 
 ```
