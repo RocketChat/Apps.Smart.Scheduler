@@ -254,7 +254,7 @@ export async function generatePreferredDateTime(
             .getValueById(SettingEnum.AI_PROVIDER_OPTOIN_ID);
 
     let body: object;
-    if(aiProvider === SettingEnum.GEMINI) {
+    if(SettingEnum.GEMINI) {
         body = {
             contents: [
                 {
@@ -274,10 +274,7 @@ export async function generatePreferredDateTime(
                 },
             ],
         };
-    }    
-    app.getLogger().debug(
-        `Request to  with payload: ${JSON.stringify(body)}`
-    );  
+    }      
     
 
     const response = await generateChatCompletions(app, http, body);
