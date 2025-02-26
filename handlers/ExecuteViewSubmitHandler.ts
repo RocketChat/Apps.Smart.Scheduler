@@ -222,7 +222,7 @@ export class ExecuteViewSubmitHandler {
                         );
                     }
 
-                    generateConstraintPrompt(
+                await   generateConstraintPrompt(
                         this.app,
                         this.http,
                         this.persistence,

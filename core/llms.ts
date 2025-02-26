@@ -36,14 +36,8 @@ export async function generateChatCompletions(
     http: IHttp,
     body: object
 ): Promise<string> {
-    
-    app.getLogger().debug('Gemini API key not set Properly');
-    app.getLogger().debug(
-        `Request to  with payload: ${JSON.stringify(body)}`
-    );
-    const response = await handleResponse(body, app, http)
 
-    app.getLogger().debug(`Response : ${JSON.stringify(response)}`);
+    const response = await handleResponse(body, app, http);
 
     if (!response) {
         throw new Error(
@@ -66,12 +60,11 @@ export async function handleResponse(
     app: SmartSchedulingApp,
     http: IHttp
 ): Promise<string> {
-    let aiProvider: string;
-    
-        aiProvider = await app
-            .getAccessors()
-            .environmentReader.getSettings()
-            .getValueById(SettingEnum.AI_PROVIDER_OPTOIN_ID);
+
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
 
     switch (aiProvider) {
@@ -89,6 +82,7 @@ export async function handleResponse(
             app.getLogger().log(errorMsg);
             return errorMsg;
     }
+
 }
 
 export async function handleSelfHostedModel(
@@ -102,13 +96,18 @@ export async function handleSelfHostedModel(
         .environmentReader.getSettings()
         .getValueById(SettingEnum.SELF_HOSTED_MODEL_ADDRESS_ID);
 
+        const model = await app
+        .getAccessors()
+        .environmentReader.getSettings()
+        .getValueById(SettingEnum.SELF_HOSTED_MODEL_NAME);
+
         if (!url) {
             app.getLogger().log('Self Hosted Model address not set.');
                 return "Your Workspace AI is not set up properly. Please contact your administrator"
             }
 
         const response: IHttpResponse = await http.post(
-            `${url}/chat/completions`,
+            `${url}/api/chat`,
             {
                 headers: {
                     'Content-Type': 'application/json',
@@ -117,16 +116,18 @@ export async function handleSelfHostedModel(
                     ...body,
                     temperature: 0,
                     stream: false,
+                    model: model
                 }),
             },
         );
 
-        if (!response || !response.data) {
+        if (!response || !response.content) {
             app.getLogger().log('No response data received from AI.');
             return "Something went wrong. Please try again later.";
         }
+        const {message}= response.data
 
-        return response.data.choices[0].message.content;
+        return message.content ;
     } catch (error) {
             app
             .getLogger()
@@ -141,7 +142,7 @@ async function handleOpenAI(
     http: IHttp
 ): Promise<string> {
     try {
-        const { openaikey, openaimodel } = await getOpenAIConfig(app);
+        const { openaikey, openaimodel} = await getOpenAIConfig(app);
 
         if (!openaikey || !openaimodel) {
             app.getLogger().log('OpenAI settings not set properly.');
@@ -149,7 +150,7 @@ async function handleOpenAI(
         }
 
         const response: IHttpResponse = await http.post(
-            'https://api.openai.com/v1/chat/completions',
+            `https://api.openai.com/v1/chat/completions`,
             {
                 headers: {
                     'Content-Type': 'application/json',
@@ -168,6 +169,7 @@ async function handleOpenAI(
         }
 
         const { choices } = response.data;
+        app.getLogger().debug(choices[0].message.content);
         return choices[0].message.content;
     } catch (error) {
         app.getLogger().log(`Error in handleOpenAI: ${error.message}`);
@@ -188,9 +190,9 @@ async function getOpenAIConfig(app: SmartSchedulingApp): Promise<{
                 app
                 .getAccessors()
                 .environmentReader.getSettings()
-                .getValueById(SettingEnum.OPEN_AI_API_MODEL_ID),
+                .getValueById(SettingEnum.OPEN_AI_API_MODEL_ID)
         ]);
-        return { openaikey: apikey, openaimodel: model };
+        return { openaikey: apikey, openaimodel: model};
 }
 
 async function handleGemini(
@@ -199,33 +201,39 @@ async function handleGemini(
     http: IHttp
 ): Promise<string> {
     try {
-        const geminiAPIkey = await getGeminiAPIKey(app);
+        const { geminikey, geminimodel } = await getGeminiConfig(app);
 
-        if (!geminiAPIkey) {
+        if (!geminikey) {
             app.getLogger().log('Gemini API key not set Properly');
+            return "AI is not configured. Please contact your administrator to use this feature.";
+        } else if (!geminimodel) {
+            app.getLogger().log('Gemini Model not set Properly');
             return "AI is not configured. Please contact your administrator to use this feature.";
         }
 
+        app.getLogger().debug(JSON.stringify(body));
+
+
         const response: IHttpResponse = await http.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiAPIkey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminimodel}:generateContent?key=${geminikey}`,
             {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                content: JSON.stringify({
-                    ...body
-                }),
+                content: JSON.stringify(body),
             },
         );
+
 
         if (!response || !response.content) {
                 app
                 .getLogger()
                 .log('No response content received from AI.');
-            return "Something went wrong. Please try again later.";
+            return "Something went wro{ng. Please try again later.";
         }
 
         const data = response.data;
+        app.getLogger().debug(`Response : ${JSON.stringify(data.candidates[0].content.parts[0].text)}`);
         return data.candidates[0].content.parts[0].text;
     } catch (error) {
         app.getLogger().log(`Error in handleGemini: ${error.message}`);
@@ -233,13 +241,21 @@ async function handleGemini(
     }
 }
 
-async function getGeminiAPIKey(app: SmartSchedulingApp): Promise<string> {
-
-        return await app
-            .getAccessors()
-            .environmentReader.getSettings()
-            .getValueById(SettingEnum.GEMINI_AI_API_KEY_ID);
-    
+async function getGeminiConfig(app: SmartSchedulingApp): Promise<{
+    geminikey: string;
+    geminimodel: string;
+}> {
+        const [apikey, model] = await Promise.all([
+                app
+                .getAccessors()
+                .environmentReader.getSettings()
+                .getValueById(SettingEnum.GEMINI_AI_API_KEY_ID),
+                app
+                .getAccessors()
+                .environmentReader.getSettings()
+                .getValueById(SettingEnum.GEMINI_AI_API_MODEL_ID),
+        ]);
+        return { geminikey: apikey, geminimodel: model };
 }
 
 export async function generatePreferredDateTime(
@@ -248,23 +264,25 @@ export async function generatePreferredDateTime(
     utcOffset: number,
     prompt: string
 ): Promise<string> {
+
     const aiProvider = await app
-            .getAccessors()
-            .environmentReader.getSettings()
-            .getValueById(SettingEnum.AI_PROVIDER_OPTOIN_ID);
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+
 
     let body: object;
-    if(SettingEnum.GEMINI) {
+    if(aiProvider === SettingEnum.GEMINI) {
         body = {
             contents: [
                 {
                     parts: {
-                        text: prompt
+                        text: constructPreferredDateTimePrompt(utcOffset, prompt),
                     },
                 },
             ],
         }
-    }  
+    }
     else {
         body = {
             messages: [
@@ -274,8 +292,8 @@ export async function generatePreferredDateTime(
                 },
             ],
         };
-    }      
-    
+    }
+
 
     const response = await generateChatCompletions(app, http, body);
     return response;
@@ -286,15 +304,50 @@ export async function getConstraintArguments(
     http: IHttp,
     prompt: string
 ): Promise<IConstraintArgs> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
-            },
-        ],
-        format: "json",
-    };
+
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+
+
+    let body: object;
+    if(aiProvider === SettingEnum.GEMINI) {
+        body = {
+            contents: [
+                {
+                    parts: {
+                        text: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
+                    },
+                },
+            ],
+            generationConfig: {
+                responseMimeType: 'application/json'
+            }
+        }
+    }
+    else if(aiProvider=== SettingEnum.OPEN_AI) {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
+                },
+            ],
+            response_format: { type: "json_object" }
+        };
+    }
+    else {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
+                },
+            ],
+            format: "json",
+        };
+    }
 
     const response = await generateChatCompletions(app, http, body);
     const args: IConstraintArgs = JSON.parse(response);
@@ -308,6 +361,7 @@ export async function generateConstraintPrompt(
     user: IUser,
     prompt: string
 ): Promise<IConstraintArgs> {
+
     const preferredDateTime = await generatePreferredDateTime(
         app,
         http,
@@ -392,15 +446,50 @@ export async function getMeetingArguments(
     http: IHttp,
     prompt: string
 ): Promise<IMeetingArgs> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
-            },
-        ],
-        format: "json",
-    };
+
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+
+
+    let body: object;
+    if(aiProvider === SettingEnum.GEMINI) {
+        body = {
+            contents: [
+                {
+                    parts: {
+                        text: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
+                    },
+                },
+            ],
+            generationConfig: {
+                responseMimeType: 'application/json'
+            }
+        }
+    }
+    else if(aiProvider === SettingEnum.OPEN_AI) {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
+                },
+            ],
+            response_format: { type: "json_object" }
+        };
+    }
+    else {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
+                },
+            ],
+            format: "json",
+        };
+    }
 
     const response = await generateChatCompletions(app, http, body);
     const args: IMeetingArgs = JSON.parse(response);
@@ -414,22 +503,66 @@ export async function getFunction(
     user: IUser,
     prompt: string
 ): Promise<IFunctionCall> {
-    const body = {
-        raw: true,
-        messages: [
-            {
-                role: "system",
-                content: constructPreferredDateTimePrompt(
-                    user.utcOffset,
-                    prompt,
-                    ASK_FUNCTION_CALL_PROMPT
-                ),
-            },
-        ],
-        format: "json",
-    };
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+
+
+    let body: object;
+    if(aiProvider === SettingEnum.GEMINI) {
+        body = {
+            contents: [
+                {
+                    parts: {
+                        text: constructPreferredDateTimePrompt(
+                            user.utcOffset,
+                            prompt,
+                            ASK_FUNCTION_CALL_PROMPT
+                        ),
+                    },
+                },
+            ],
+            generationConfig: {
+                responseMimeType: 'application/json'
+            }
+        }
+    }
+    else if(aiProvider === SettingEnum.OPEN_AI) {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: constructPreferredDateTimePrompt(
+                        user.utcOffset,
+                        prompt,
+                        ASK_FUNCTION_CALL_PROMPT
+                    ),
+                },
+            ],
+            response_format: { type: "json_object" }
+        };
+    }
+    else {
+        body = {
+            raw: true,
+            messages: [
+                {
+                    role: "system",
+                    content: constructPreferredDateTimePrompt(
+                        user.utcOffset,
+                        prompt,
+                        ASK_FUNCTION_CALL_PROMPT
+                    ),
+                },
+            ],
+            format: "json",
+        };
+    }
+
 
     const response = await generateChatCompletions(app, http, body);
+    app.getLogger().debug(response)
     return JSON.parse(response) as IFunctionCall;
 }
 
@@ -457,17 +590,54 @@ export async function getRecommendedTime(
         ----------------`;
     });
 
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
-                    "{prompt}",
-                    prompt
-                ).replace("{common_time}", commonTimePrompt),
-            },
-        ],
-    };
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+
+
+    let body: object;
+    if(aiProvider === SettingEnum.GEMINI) {
+        body = {
+            contents: [
+                {
+                    parts: {
+                        text: RECOMMENDED_COMMON_TIME_PROMPT.replace(
+                            "{prompt}",
+                            prompt
+                        ).replace("{common_time}", commonTimePrompt),
+                    },
+                },
+            ],
+        }
+    }
+    else if(aiProvider ===SettingEnum.OPEN_AI) {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
+                        "{prompt}",
+                        prompt
+                    ).replace("{common_time}", commonTimePrompt),
+                },
+            ],
+        };
+    }
+    else {
+        body = {
+            messages: [
+                {
+                    role: "system",
+                    content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
+                        "{prompt}",
+                        prompt
+                    ).replace("{common_time}", commonTimePrompt),
+                },
+            ],
+        };
+    }
+
 
     const response = await generateChatCompletions(app, http, body);
 
