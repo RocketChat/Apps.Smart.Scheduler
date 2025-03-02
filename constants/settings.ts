@@ -4,34 +4,39 @@ import {
 } from '@rocket.chat/apps-engine/definition/settings';
 
 export enum SettingEnum {
-	AI_PROVIDER_OPTION_ID = 'ai-provider-option-id',
-	SELF_HOSTED_MODEL_ADDRESS_ID = 'self-hosted-model-address-id',
-	OPEN_AI_API_KEY_ID = ' open-ai-api-key-id',
-	OPEN_AI_API_MODEL_ID = 'open-ai-api-model-id',
-	GEMINI_AI_API_KEY_ID = 'gemini-ai-api-key-id',
-    GEMINI_AI_API_MODEL_ID = 'gemini-ai-api-model-id',
-    SELF_HOSTED_MODEL_NAME = 'self-hosted-model-name',
+    AI_PROVIDER_OPTION_ID = 'ai-provider-option-id',
+	MODEL_SELECTION = 'model-selection',
+    ROCKETCHAT_INTERNAL_MODEL = "internal-llm",
+    AI_MODEL_API_URL = 'api-url',
+	AI_API_KEY = "api-key",
+	AI_MODEL_NAME = 'ai-model-name',
 	SELF_HOSTED_MODEL = 'self-hosted-model',
 	OPEN_AI = 'open-ai',
 	GEMINI = 'gemini',
+    LLAMA3_8B = 'llama3-8b',
+    MISTRAL_7B = 'mistral-7b',
 }
 
-export const settings: Array<ISetting> = [
-	{
+export const settings: ISetting[] = [
+    {
 		id: SettingEnum.AI_PROVIDER_OPTION_ID,
 		type: SettingType.SELECT,
-		packageValue: SettingEnum.SELF_HOSTED_MODEL,
+		packageValue: SettingEnum.ROCKETCHAT_INTERNAL_MODEL,
 		required: true,
 		public: false,
-		i18nLabel: 'AI Provider',
+		i18nLabel: 'Choose AI Provider',
 		values: [
+            {
+				key: SettingEnum.ROCKETCHAT_INTERNAL_MODEL,
+				i18nLabel: 'RocketChat Internal LLM',
+			},
 			{
 				key: SettingEnum.SELF_HOSTED_MODEL,
-				i18nLabel: 'Self Hosted AI Model',
+				i18nLabel: 'Ollama Self Hosted',
 			},
 			{
 				key: SettingEnum.OPEN_AI,
-				i18nLabel: 'Open AI',
+				i18nLabel: 'OpenAI & OpenAI API-Compatible LLM Provider (Together, Groq etc.)',
 			},
 			{
 				key: SettingEnum.GEMINI,
@@ -40,52 +45,40 @@ export const settings: Array<ISetting> = [
 		],
 	},
 	{
-		id: SettingEnum.SELF_HOSTED_MODEL_ADDRESS_ID,
-		type: SettingType.STRING,
-		packageValue: '',
+		id: SettingEnum.MODEL_SELECTION,
+		i18nLabel: 'Model selection',
+		i18nDescription: 'AI model to use for summarization.(For RocketChat Internal LLM)',
+		type: SettingType.SELECT,
+		values: [
+			{ key: SettingEnum.LLAMA3_8B, i18nLabel: 'Llama3 8B' },
+			{ key: SettingEnum.MISTRAL_7B, i18nLabel: 'Mistral 7B' },
+		],
 		required: true,
-		public: false,
-		i18nLabel: 'Self Hosted AI Model URL',
+		public: true,
+		packageValue: SettingEnum.LLAMA3_8B,
 	},
     {
-		id: SettingEnum.SELF_HOSTED_MODEL_NAME,
+		id: SettingEnum.AI_MODEL_API_URL,
 		type: SettingType.STRING,
 		packageValue: '',
 		required: true,
 		public: false,
-		i18nLabel: 'Self Hosted AI Model Name',
+		i18nLabel: 'AI model api url',
 	},
-	{
-		id: SettingEnum.OPEN_AI_API_KEY_ID,
+    {
+		id: SettingEnum.AI_API_KEY,
 		type: SettingType.PASSWORD,
 		packageValue: '',
 		required: true,
 		public: false,
-		i18nLabel: 'Open AI API Key',
-	},
-	{
-		id: SettingEnum.OPEN_AI_API_MODEL_ID,
-		type: SettingType.STRING,
-		packageValue: '',
-		required: true,
-		public: false,
-		i18nLabel: 'Open AI Model',
-	},
-	{
-		id: SettingEnum.GEMINI_AI_API_KEY_ID,
-		type: SettingType.PASSWORD,
-		packageValue: '',
-		required: true,
-		public: false,
-		i18nLabel: 'Gemini API Key',
+		i18nLabel: 'AI API key',
 	},
     {
-		id: SettingEnum.GEMINI_AI_API_MODEL_ID,
+		id: SettingEnum.AI_MODEL_NAME,
 		type: SettingType.STRING,
 		packageValue: '',
 		required: true,
 		public: false,
-		i18nLabel: 'Gemini Model',
-        value: 'gemini-1.5-flash-latest'
+		i18nLabel: 'AI model name',
 	},
 ];

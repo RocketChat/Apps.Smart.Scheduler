@@ -36,8 +36,28 @@ export async function generateChatCompletions(
     http: IHttp,
     body: object
 ): Promise<string> {
+    let model: string;
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
-    const response = await handleResponse(body, app, http);
+    if(aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL){
+        model = await app
+        .getAccessors()
+        .environmentReader.getSettings()
+        .getValueById(SettingEnum.MODEL_SELECTION)
+    }
+    else {
+        model = await app
+        .getAccessors()
+        .environmentReader.getSettings()
+        .getValueById(SettingEnum.AI_MODEL_NAME)
+    }
+
+    const mainBody = {...body, model: model}
+
+    const response = await handleResponse(mainBody, app, http);
 
     if (!response) {
         throw new Error(
@@ -66,48 +86,54 @@ export async function handleResponse(
     .environmentReader.getSettings()
     .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
+    const apiKey = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_API_KEY);
+
+    const apiUrl = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_MODEL_API_URL);
+
+    const safeUrl = cleanApiUrl(apiUrl)
 
     switch (aiProvider) {
+        case SettingEnum.ROCKETCHAT_INTERNAL_MODEL:
+            return await handleInternalLLM(body, app, http);
+
         case SettingEnum.SELF_HOSTED_MODEL:
-            return handleSelfHostedModel(body, app, http);
+            return await handleSelfHostedModel(body, app, http, safeUrl);
 
         case SettingEnum.OPEN_AI:
-            return handleOpenAI(body, app, http);
+            return await handleOpenAI(body, app, http, safeUrl, apiKey);
 
         case SettingEnum.GEMINI:
-            return handleGemini(body, app, http);
+            return await handleGemini(body, app, http, apiKey);
 
-        default:
-            const errorMsg = "Error: AI provider is not configured correctly.";
+        default: {
+            const errorMsg = 'Error: AI provider is not configured correctly.';
             app.getLogger().log(errorMsg);
             return errorMsg;
+        }
     }
 
 }
 
-export async function handleSelfHostedModel(
-    body: any,
-    app: SmartSchedulingApp,
-    http: IHttp
+async function handleInternalLLM(
+    body: object,
+    app : SmartSchedulingApp,
+    http: IHttp,
 ): Promise<string> {
     try {
-        const url = await app
-        .getAccessors()
-        .environmentReader.getSettings()
-        .getValueById(SettingEnum.SELF_HOSTED_MODEL_ADDRESS_ID);
 
-        const model = await app
-        .getAccessors()
-        .environmentReader.getSettings()
-        .getValueById(SettingEnum.SELF_HOSTED_MODEL_NAME);
-
-        if (!url) {
-            app.getLogger().log('Self Hosted Model address not set.');
-                return "Your Workspace AI is not set up properly. Please contact your administrator"
-            }
+        const modelname = await app
+		.getAccessors()
+		.environmentReader.getSettings()
+		.getValueById(SettingEnum.MODEL_SELECTION);
 
         const response: IHttpResponse = await http.post(
-            `${url}/api/chat`,
+            `http://${modelname}/v1/chat/completions`,
             {
                 headers: {
                     'Content-Type': 'application/json',
@@ -115,19 +141,60 @@ export async function handleSelfHostedModel(
                 content: JSON.stringify({
                     ...body,
                     temperature: 0,
-                    stream: false,
-                    model: model
                 }),
-            },
-        );
+            });
 
-        if (!response || !response.content) {
-            app.getLogger().log('No response data received from AI.');
-            return "Something went wrong. Please try again later.";
-        }
-        const {message}= response.data
+            if (!response || !response.data) {
+                app.getLogger().log('No response data received from AI.');
+                return "Something went wrong. Please try again later.";
+            }
 
-        return message.content ;
+            const { choices } = response.data;
+            app.getLogger().debug(choices);
+            return choices[0].message.content;
+
+    } catch (error) {
+            app
+            .getLogger()
+            .log(`Error in handleInternalLLM: ${error.message}`);
+        return "Something went wrong. Please try again later.";
+}
+}
+
+async function handleSelfHostedModel(
+    body: any,
+    app: SmartSchedulingApp,
+    http: IHttp,
+    apiUrl: string
+): Promise<string> {
+    try {
+
+        if (!apiUrl) {
+            app.getLogger().log('Self Hosted Model address not set.');
+                return "Your Workspace AI is not set up properly. Please contact your administrator"
+            }
+            const response: IHttpResponse = await http.post(
+                `${apiUrl}/api/chat`,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    content: JSON.stringify({
+                        ...body,
+                        stream: false,
+                        temperature: 0,
+                    }),
+                },
+            );
+
+            if (!response || !response.data) {
+                app.getLogger().log('No response data received from AI.');
+                return "Something went wrong. Please try again later.";
+            }
+
+            const {message}= response.data
+            app.getLogger().debug(message.content)
+            return message.content ;
     } catch (error) {
             app
             .getLogger()
@@ -139,30 +206,29 @@ export async function handleSelfHostedModel(
 async function handleOpenAI(
     body: any,
     app: SmartSchedulingApp,
-    http: IHttp
+    http: IHttp,
+    apiUrl: string,
+    apiKey: string
 ): Promise<string> {
     try {
-        const { openaikey, openaimodel} = await getOpenAIConfig(app);
-
-        if (!openaikey || !openaimodel) {
+        if (!apiKey || !apiUrl) {
             app.getLogger().log('OpenAI settings not set properly.');
             return "AI is not configured. Please contact your administrator to use this feature."
         }
 
         const response: IHttpResponse = await http.post(
-            `https://api.openai.com/v1/chat/completions`,
+            `${apiUrl}/v1/chat/completions`,
             {
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${openaikey}`,
+                    Authorization: `Bearer ${apiKey}`,
                 },
                 content: JSON.stringify({
-                    model: openaimodel,
-                    ...body
+                    ...body,
+                    temperature: 0,
                 }),
             },
         );
-
         if (!response || !response.data) {
             app.getLogger().log('No response data received from AI.');
             return "Something went wrong. Please try again later.";
@@ -178,58 +244,29 @@ async function handleOpenAI(
 }
 
 
-async function getOpenAIConfig(app: SmartSchedulingApp): Promise<{
-    openaikey: string;
-    openaimodel: string;
-}> {
-        const [apikey, model] = await Promise.all([
-                app
-                .getAccessors()
-                .environmentReader.getSettings()
-                .getValueById(SettingEnum.OPEN_AI_API_KEY_ID),
-                app
-                .getAccessors()
-                .environmentReader.getSettings()
-                .getValueById(SettingEnum.OPEN_AI_API_MODEL_ID)
-        ]);
-        return { openaikey: apikey, openaimodel: model};
-}
-
 async function handleGemini(
     body: any,
     app: SmartSchedulingApp,
-    http: IHttp
+    http: IHttp,
+    apiKey: string
 ): Promise<string> {
     try {
-        const { geminikey, geminimodel } = await getGeminiConfig(app);
-
-        if (!geminikey) {
-            app.getLogger().log('Gemini API key not set Properly');
-            return "AI is not configured. Please contact your administrator to use this feature.";
-        } else if (!geminimodel) {
-            app.getLogger().log('Gemini Model not set Properly');
+        if (!apiKey) {
+            app.getLogger().log('Gemini API key is missing.');
             return "AI is not configured. Please contact your administrator to use this feature.";
         }
 
-        app.getLogger().debug(JSON.stringify(body));
-
-
-        const response: IHttpResponse = await http.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/${geminimodel}:generateContent?key=${geminikey}`,
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                content: JSON.stringify(body),
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${body.model}:generateContent?key=${apiKey}`;
+        const response: IHttpResponse = await http.post(apiUrl, {
+            headers: {
+                'Content-Type': 'application/json',
             },
-        );
+            content: JSON.stringify(body),
+        });
 
-
-        if (!response || !response.content) {
-                app
-                .getLogger()
-                .log('No response content received from AI.');
-            return "Something went wro{ng. Please try again later.";
+        if (!response || !response.data) {
+            app.getLogger().log('No response data received from Gemini.');
+            return "Something went wrong. Please try again later.";
         }
 
         const data = response.data;
@@ -241,22 +278,10 @@ async function handleGemini(
     }
 }
 
-async function getGeminiConfig(app: SmartSchedulingApp): Promise<{
-    geminikey: string;
-    geminimodel: string;
-}> {
-        const [apikey, model] = await Promise.all([
-                app
-                .getAccessors()
-                .environmentReader.getSettings()
-                .getValueById(SettingEnum.GEMINI_AI_API_KEY_ID),
-                app
-                .getAccessors()
-                .environmentReader.getSettings()
-                .getValueById(SettingEnum.GEMINI_AI_API_MODEL_ID),
-        ]);
-        return { geminikey: apikey, geminimodel: model };
+function cleanApiUrl(apiUrl: string): string {
+    return apiUrl.replace(/(\/v1\/chat\/completions|\/api\/chat|\/chat\/completions|\/v1\/chat|\/api\/generate)\/?$/, '');
 }
+
 
 export async function generatePreferredDateTime(
     app: SmartSchedulingApp,
@@ -326,7 +351,7 @@ export async function getConstraintArguments(
             }
         }
     }
-    else if(aiProvider=== SettingEnum.OPEN_AI) {
+    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
         body = {
             messages: [
                 {
@@ -468,7 +493,7 @@ export async function getMeetingArguments(
             }
         }
     }
-    else if(aiProvider === SettingEnum.OPEN_AI) {
+    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
         body = {
             messages: [
                 {
@@ -528,7 +553,7 @@ export async function getFunction(
             }
         }
     }
-    else if(aiProvider === SettingEnum.OPEN_AI) {
+    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
         body = {
             messages: [
                 {
@@ -611,7 +636,7 @@ export async function getRecommendedTime(
             ],
         }
     }
-    else if(aiProvider ===SettingEnum.OPEN_AI) {
+    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
         body = {
             messages: [
                 {
