@@ -30,257 +30,7 @@ import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { CommonTimeExtractor } from "./algorithm";
 import { getFreeBusySchedule } from "./googleCalendar";
 import { SettingEnum } from "../constants/settings";
-
-export async function generateChatCompletions(
-    app: SmartSchedulingApp,
-    http: IHttp,
-    body: object
-): Promise<string> {
-    let model: string;
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
-
-    if(aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL){
-        model = await app
-        .getAccessors()
-        .environmentReader.getSettings()
-        .getValueById(SettingEnum.MODEL_SELECTION)
-    }
-    else {
-        model = await app
-        .getAccessors()
-        .environmentReader.getSettings()
-        .getValueById(SettingEnum.AI_MODEL_NAME)
-    }
-
-    const mainBody = {...body, model: model}
-
-    const response = await handleResponse(mainBody, app, http);
-
-    if (!response) {
-        throw new Error(
-            "Something is wrong with the API. Please try again later"
-        );
-    }
-
-    try {
-        return response;
-    } catch (error) {
-        app.getLogger().error(`Error parsing response: ${error}`);
-        throw new Error(
-            `Invalid response from API: ${JSON.stringify(response)}`
-        );
-    }
-}
-
-export async function handleResponse(
-    body: any,
-    app: SmartSchedulingApp,
-    http: IHttp
-): Promise<string> {
-
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
-
-    const apiKey = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_API_KEY);
-
-    const apiUrl = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_MODEL_API_URL);
-
-    const safeUrl = cleanApiUrl(apiUrl)
-
-    switch (aiProvider) {
-        case SettingEnum.ROCKETCHAT_INTERNAL_MODEL:
-            return await handleInternalLLM(body, app, http);
-
-        case SettingEnum.SELF_HOSTED_MODEL:
-            return await handleSelfHostedModel(body, app, http, safeUrl);
-
-        case SettingEnum.OPEN_AI:
-            return await handleOpenAI(body, app, http, safeUrl, apiKey);
-
-        case SettingEnum.GEMINI:
-            return await handleGemini(body, app, http, apiKey);
-
-        default: {
-            const errorMsg = 'Error: AI provider is not configured correctly.';
-            app.getLogger().log(errorMsg);
-            return errorMsg;
-        }
-    }
-
-}
-
-async function handleInternalLLM(
-    body: object,
-    app : SmartSchedulingApp,
-    http: IHttp,
-): Promise<string> {
-    try {
-
-        const modelname = await app
-		.getAccessors()
-		.environmentReader.getSettings()
-		.getValueById(SettingEnum.MODEL_SELECTION);
-
-        const response: IHttpResponse = await http.post(
-            `http://${modelname}/v1/chat/completions`,
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                content: JSON.stringify({
-                    ...body,
-                    temperature: 0,
-                }),
-            });
-
-            if (!response || !response.data) {
-                app.getLogger().log('No response data received from AI.');
-                return "Something went wrong. Please try again later.";
-            }
-
-            const { choices } = response.data;
-            app.getLogger().debug(choices);
-            return choices[0].message.content;
-
-    } catch (error) {
-            app
-            .getLogger()
-            .log(`Error in handleInternalLLM: ${error.message}`);
-        return "Something went wrong. Please try again later.";
-}
-}
-
-async function handleSelfHostedModel(
-    body: any,
-    app: SmartSchedulingApp,
-    http: IHttp,
-    apiUrl: string
-): Promise<string> {
-    try {
-
-        if (!apiUrl) {
-            app.getLogger().log('Self Hosted Model address not set.');
-                return "Your Workspace AI is not set up properly. Please contact your administrator"
-            }
-            const response: IHttpResponse = await http.post(
-                `${apiUrl}/api/chat`,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    content: JSON.stringify({
-                        ...body,
-                        stream: false,
-                        temperature: 0,
-                    }),
-                },
-            );
-
-            if (!response || !response.data) {
-                app.getLogger().log('No response data received from AI.');
-                return "Something went wrong. Please try again later.";
-            }
-
-            const {message}= response.data
-            app.getLogger().debug(message.content)
-            return message.content ;
-    } catch (error) {
-            app
-            .getLogger()
-            .log(`Error in handleSelfHostedModel: ${error.message}`);
-        return "Something went wrong. Please try again later.";
-}
-}
-
-async function handleOpenAI(
-    body: any,
-    app: SmartSchedulingApp,
-    http: IHttp,
-    apiUrl: string,
-    apiKey: string
-): Promise<string> {
-    try {
-        if (!apiKey || !apiUrl) {
-            app.getLogger().log('OpenAI settings not set properly.');
-            return "AI is not configured. Please contact your administrator to use this feature."
-        }
-
-        const response: IHttpResponse = await http.post(
-            `${apiUrl}/v1/chat/completions`,
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${apiKey}`,
-                },
-                content: JSON.stringify({
-                    ...body,
-                    temperature: 0,
-                }),
-            },
-        );
-        if (!response || !response.data) {
-            app.getLogger().log('No response data received from AI.');
-            return "Something went wrong. Please try again later.";
-        }
-
-        const { choices } = response.data;
-        app.getLogger().debug(choices[0].message.content);
-        return choices[0].message.content;
-    } catch (error) {
-        app.getLogger().log(`Error in handleOpenAI: ${error.message}`);
-        return "Something went wrong. Please try again later.";
-    }
-}
-
-
-async function handleGemini(
-    body: any,
-    app: SmartSchedulingApp,
-    http: IHttp,
-    apiKey: string
-): Promise<string> {
-    try {
-        if (!apiKey) {
-            app.getLogger().log('Gemini API key is missing.');
-            return "AI is not configured. Please contact your administrator to use this feature.";
-        }
-
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${body.model}:generateContent?key=${apiKey}`;
-        const response: IHttpResponse = await http.post(apiUrl, {
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            content: JSON.stringify(body),
-        });
-
-        if (!response || !response.data) {
-            app.getLogger().log('No response data received from Gemini.');
-            return "Something went wrong. Please try again later.";
-        }
-
-        const data = response.data;
-        app.getLogger().debug(`Response : ${JSON.stringify(data.candidates[0].content.parts[0].text)}`);
-        return data.candidates[0].content.parts[0].text;
-    } catch (error) {
-        app.getLogger().log(`Error in handleGemini: ${error.message}`);
-        return "Something went wrong. Please try again later.";
-    }
-}
-
-function cleanApiUrl(apiUrl: string): string {
-    return apiUrl.replace(/(\/v1\/chat\/completions|\/api\/chat|\/chat\/completions|\/v1\/chat|\/api\/generate)\/?$/, '');
-}
+import { getJSONResponse, handleAIRequest } from "../lib/aiProvider";
 
 
 export async function generatePreferredDateTime(
@@ -290,37 +40,16 @@ export async function generatePreferredDateTime(
     prompt: string
 ): Promise<string> {
 
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+    const finalPrompt = constructPreferredDateTimePrompt(utcOffset, prompt)
 
-
-    let body: object;
-    if(aiProvider === SettingEnum.GEMINI) {
-        body = {
-            contents: [
-                {
-                    parts: {
-                        text: constructPreferredDateTimePrompt(utcOffset, prompt),
-                    },
-                },
-            ],
+    const response = await handleAIRequest(
+        app,
+        http,
+        {
+            prompt: finalPrompt,
         }
-    }
-    else {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: constructPreferredDateTimePrompt(utcOffset, prompt),
-                },
-            ],
-        };
-    }
+    )
 
-
-    const response = await generateChatCompletions(app, http, body);
     return response;
 }
 
@@ -335,47 +64,15 @@ export async function getConstraintArguments(
     .environmentReader.getSettings()
     .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
+    const finalprompt = CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt);
 
-    let body: object;
-    if(aiProvider === SettingEnum.GEMINI) {
-        body = {
-            contents: [
-                {
-                    parts: {
-                        text: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
-                    },
-                },
-            ],
-            generationConfig: {
-                responseMimeType: 'application/json'
-            }
-        }
-    }
-    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
-                },
-            ],
-            response_format: { type: "json_object" }
-        };
-    }
-    else {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
-                },
-            ],
-            format: "json",
-        };
-    }
+    const response = await getJSONResponse(
+        app,
+        http,
+        finalprompt
+    )
 
-    const response = await generateChatCompletions(app, http, body);
-    const args: IConstraintArgs = JSON.parse(response);
+    const args: IConstraintArgs = response;
     return args;
 }
 
@@ -472,52 +169,15 @@ export async function getMeetingArguments(
     prompt: string
 ): Promise<IMeetingArgs> {
 
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+    const finalPromt = MEETING_ARGS_PROMPT.replace("{prompt}", prompt)
 
+    const response = await getJSONResponse(
+        app,
+        http,
+        finalPromt
+    )
 
-    let body: object;
-    if(aiProvider === SettingEnum.GEMINI) {
-        body = {
-            contents: [
-                {
-                    parts: {
-                        text: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
-                    },
-                },
-            ],
-            generationConfig: {
-                responseMimeType: 'application/json'
-            }
-        }
-    }
-    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
-                },
-            ],
-            response_format: { type: "json_object" }
-        };
-    }
-    else {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
-                },
-            ],
-            format: "json",
-        };
-    }
-
-    const response = await generateChatCompletions(app, http, body);
-    const args: IMeetingArgs = JSON.parse(response);
+    const args: IMeetingArgs = response;
 
     return args;
 }
@@ -533,62 +193,19 @@ export async function getFunction(
     .environmentReader.getSettings()
     .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
+    const finalPrompt = constructPreferredDateTimePrompt(
+        user.utcOffset,
+        prompt,
+        ASK_FUNCTION_CALL_PROMPT
+    )
 
-    let body: object;
-    if(aiProvider === SettingEnum.GEMINI) {
-        body = {
-            contents: [
-                {
-                    parts: {
-                        text: constructPreferredDateTimePrompt(
-                            user.utcOffset,
-                            prompt,
-                            ASK_FUNCTION_CALL_PROMPT
-                        ),
-                    },
-                },
-            ],
-            generationConfig: {
-                responseMimeType: 'application/json'
-            }
-        }
-    }
-    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: constructPreferredDateTimePrompt(
-                        user.utcOffset,
-                        prompt,
-                        ASK_FUNCTION_CALL_PROMPT
-                    ),
-                },
-            ],
-            response_format: { type: "json_object" }
-        };
-    }
-    else {
-        body = {
-            raw: true,
-            messages: [
-                {
-                    role: "system",
-                    content: constructPreferredDateTimePrompt(
-                        user.utcOffset,
-                        prompt,
-                        ASK_FUNCTION_CALL_PROMPT
-                    ),
-                },
-            ],
-            format: "json",
-        };
-    }
+    const response = await getJSONResponse(
+        app,
+        http,
+        finalPrompt
+    )
 
-
-    const response = await generateChatCompletions(app, http, body);
-    app.getLogger().debug(response)
-    return JSON.parse(response) as IFunctionCall;
+    return response as IFunctionCall;
 }
 
 export async function getRecommendedTime(
@@ -615,60 +232,22 @@ export async function getRecommendedTime(
         ----------------`;
     });
 
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
+    const finalPrompt = RECOMMENDED_COMMON_TIME_PROMPT.replace(
+        "{prompt}",
+        prompt
+    ).replace("{common_time}", commonTimePrompt)
 
-
-    let body: object;
-    if(aiProvider === SettingEnum.GEMINI) {
-        body = {
-            contents: [
-                {
-                    parts: {
-                        text: RECOMMENDED_COMMON_TIME_PROMPT.replace(
-                            "{prompt}",
-                            prompt
-                        ).replace("{common_time}", commonTimePrompt),
-                    },
-                },
-            ],
+    const response = await handleAIRequest(
+        app,
+        http,
+        {
+            prompt: finalPrompt,
         }
-    }
-    else if(aiProvider === SettingEnum.OPEN_AI && aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL) {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
-                        "{prompt}",
-                        prompt
-                    ).replace("{common_time}", commonTimePrompt),
-                },
-            ],
-        };
-    }
-    else {
-        body = {
-            messages: [
-                {
-                    role: "system",
-                    content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
-                        "{prompt}",
-                        prompt
-                    ).replace("{common_time}", commonTimePrompt),
-                },
-            ],
-        };
-    }
-
-
-    const response = await generateChatCompletions(app, http, body);
+    )
 
     await sendNotification(
-        this.read,
-        this.modify,
+        read,
+        modify,
         user,
         room,
         `Just a little more... ;)`

@@ -36,7 +36,7 @@ export const settings: ISetting[] = [
 			},
 			{
 				key: SettingEnum.OPEN_AI,
-				i18nLabel: 'OpenAI & OpenAI API-Compatible LLM Provider (Together, Groq etc.)',
+				i18nLabel: 'OpenAI',
 			},
 			{
 				key: SettingEnum.GEMINI,
@@ -47,13 +47,13 @@ export const settings: ISetting[] = [
 	{
 		id: SettingEnum.MODEL_SELECTION,
 		i18nLabel: 'Model selection',
-		i18nDescription: 'AI model to use for summarization.(For RocketChat Internal LLM)',
+		i18nDescription: 'Select Model.(For RocketChat Internal LLM)',
 		type: SettingType.SELECT,
 		values: [
 			{ key: SettingEnum.LLAMA3_8B, i18nLabel: 'Llama3 8B' },
 			{ key: SettingEnum.MISTRAL_7B, i18nLabel: 'Mistral 7B' },
 		],
-		required: true,
+		required: false,
 		public: true,
 		packageValue: SettingEnum.LLAMA3_8B,
 	},
@@ -61,17 +61,17 @@ export const settings: ISetting[] = [
 		id: SettingEnum.AI_MODEL_API_URL,
 		type: SettingType.STRING,
 		packageValue: '',
-		required: true,
+		required: false,
 		public: false,
-		i18nLabel: 'AI model api url',
+		i18nLabel: 'AI model api url(For Self Hosted Ollama)',
 	},
     {
 		id: SettingEnum.AI_API_KEY,
 		type: SettingType.PASSWORD,
 		packageValue: '',
-		required: true,
+		required: false,
 		public: false,
-		i18nLabel: 'AI API key',
+		i18nLabel: 'AI API key(For Gemini and Openai)',
 	},
     {
 		id: SettingEnum.AI_MODEL_NAME,
