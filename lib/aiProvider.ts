@@ -10,8 +10,8 @@ type ResponseFormatConfig =
     | {};
 
 export const AI_PROVIDERS = {
-    [SettingEnum.ROCKETCHAT_INTERNAL_MODEL]: {
-    constructUrl: ({ baseModel }) => `http://${baseModel}/v1/chat/completions`,
+    [SettingEnum.SELF_HOSTED_MODEL]: {
+    constructUrl: ({apiUrl, baseModel }) => `${normalizeApiUrl(apiUrl, baseModel)}/v1/chat/completions`,
     constructHeaders: () => ({ 'Content-Type': 'application/json' }),
     prepareBody: (prompt) => ({
         messages: [{ role: "system", content: prompt }],
@@ -46,18 +46,6 @@ export const AI_PROVIDERS = {
         format === 'json' ? { generationConfig: { responseMimeType: "application/json" } } : {},
     extractResponse: (data) => data.candidates[0].content.parts[0].text
 },
-
-    [SettingEnum.SELF_HOSTED_MODEL]: {
-    constructUrl: ({ apiUrl }) => apiUrl,
-    constructHeaders: () => ({ 'Content-Type': 'application/json' }),
-    prepareBody: (prompt) => ({
-        prompt: prompt,
-        stream: false,
-    }),
-    getResponseFormat: (format): ResponseFormatConfig =>
-        format === 'json' ? { format: "json" } : {},
-    extractResponse: (data) => data.response
-}
 };
 
 export function constructBodyOptions(
@@ -96,25 +84,6 @@ export async function handleAIRequest(
     .environmentReader.getSettings()
     .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
-    let model: string;
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
-
-    if(aiProvider === SettingEnum.ROCKETCHAT_INTERNAL_MODEL){
-            model = await app
-            .getAccessors()
-            .environmentReader.getSettings()
-            .getValueById(SettingEnum.MODEL_SELECTION)
-        }
-        else {
-            model = await app
-            .getAccessors()
-            .environmentReader.getSettings()
-            .getValueById(SettingEnum.AI_MODEL_NAME)
-    }
-
     const {prompt, responseFormat, temperature } = options;
     const config = AI_PROVIDERS[provider];
 
@@ -124,8 +93,21 @@ export async function handleAIRequest(
         app.getAccessors().environmentReader.getSettings().getValueById(SettingEnum.MODEL_SELECTION)
     ]);
 
+    let model: string = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_MODEL_NAME);
+
+
+    if(provider === SettingEnum.SELF_HOSTED_MODEL && !model){
+        model = await app
+        .getAccessors()
+        .environmentReader.getSettings()
+        .getValueById(SettingEnum.MODEL_SELECTION)
+}
+
     let requestBody
-    if(aiProvider === SettingEnum.GEMINI){
+    if(provider === SettingEnum.GEMINI){
         requestBody = {
             ...config.prepareBody(prompt),
             ...constructBodyOptions(provider, { responseFormat })
@@ -179,3 +161,16 @@ export async function getJSONResponse(
 
     return JSON.parse(response);
 }
+
+
+const normalizeApiUrl = (apiUrl, baseModel) => {
+    if (!apiUrl) {
+        return `http://${baseModel}`;
+    }
+
+    // Remove known suffixes from the API URL
+    return apiUrl
+        .replace(/\/v1\/chat\/completions$/, '')
+        .replace(/\/api\/generate$/, '')
+        .replace(/\/api\/chat$/, '')
+};

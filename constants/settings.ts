@@ -6,11 +6,10 @@ import {
 export enum SettingEnum {
     AI_PROVIDER_OPTION_ID = 'ai-provider-option-id',
 	MODEL_SELECTION = 'model-selection',
-    ROCKETCHAT_INTERNAL_MODEL = "internal-llm",
+    SELF_HOSTED_MODEL = "selfhosted-llm",
     AI_MODEL_API_URL = 'api-url',
 	AI_API_KEY = "api-key",
 	AI_MODEL_NAME = 'ai-model-name',
-	SELF_HOSTED_MODEL = 'self-hosted-model',
 	OPEN_AI = 'open-ai',
 	GEMINI = 'gemini',
     LLAMA3_8B = 'llama3-8b',
@@ -21,18 +20,14 @@ export const settings: ISetting[] = [
     {
 		id: SettingEnum.AI_PROVIDER_OPTION_ID,
 		type: SettingType.SELECT,
-		packageValue: SettingEnum.ROCKETCHAT_INTERNAL_MODEL,
+		packageValue: SettingEnum.SELF_HOSTED_MODEL,
 		required: true,
 		public: false,
 		i18nLabel: 'Choose AI Provider',
 		values: [
             {
-				key: SettingEnum.ROCKETCHAT_INTERNAL_MODEL,
-				i18nLabel: 'RocketChat Internal LLM',
-			},
-			{
 				key: SettingEnum.SELF_HOSTED_MODEL,
-				i18nLabel: 'Ollama Self Hosted',
+				i18nLabel: 'Self Hosted LLM',
 			},
 			{
 				key: SettingEnum.OPEN_AI,

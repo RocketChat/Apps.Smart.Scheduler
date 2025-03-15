@@ -59,11 +59,6 @@ export async function getConstraintArguments(
     prompt: string
 ): Promise<IConstraintArgs> {
 
-    const aiProvider = await app
-    .getAccessors()
-    .environmentReader.getSettings()
-    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
-
     const finalprompt = CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt);
 
     const response = await getJSONResponse(
