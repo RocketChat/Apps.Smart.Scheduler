@@ -1,5 +1,6 @@
 import {
     IHttp,
+    IHttpResponse,
     IModify,
     IPersistence,
     IRead,
@@ -28,62 +29,9 @@ import { sendNotification } from "../lib/messages";
 import { SmartSchedulingApp } from "../SmartSchedulingApp";
 import { CommonTimeExtractor } from "./algorithm";
 import { getFreeBusySchedule } from "./googleCalendar";
+import { SettingEnum } from "../constants/settings";
+import { getJSONResponse, handleAIRequest } from "../lib/aiProvider";
 
-export async function generateChatCompletions(
-    app: SmartSchedulingApp,
-    http: IHttp,
-    body: object
-): Promise<string> {
-    // const model = await app
-    //     .getAccessors()
-    //     .environmentReader.getSettings()
-    //     .getValueById("model");
-    // const url = `http://${model}/v1` + "/chat/completions";
-    // body = {
-    //     ...body,
-    //     model: model,
-    //     temperature: 0,
-    // };
-
-    const model = "mistral";
-    const url = "http://host.docker.internal:11434/api/chat";
-    body = {
-        ...body,
-        model: model,
-        temperature: 0,
-        options: { temperature: 0 },
-        stream: false,
-    };
-
-    app.getLogger().debug(
-        `Request to ${url} with payload: ${JSON.stringify(body)}`
-    );
-
-    const response = await http.post(url, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        content: JSON.stringify(body),
-    });
-
-    app.getLogger().debug(`Response from ${url}: ${JSON.stringify(response)}`);
-
-    if (!response || !response.content) {
-        throw new Error(
-            "Something is wrong with the API. Please try again later"
-        );
-    }
-
-    try {
-        return JSON.parse(response.content).message.content;
-        // return JSON.parse(response.content).choices[0].message.content;
-    } catch (error) {
-        app.getLogger().error(`Error parsing response: ${error}`);
-        throw new Error(
-            `Invalid response from API: ${JSON.stringify(response)}`
-        );
-    }
-}
 
 export async function generatePreferredDateTime(
     app: SmartSchedulingApp,
@@ -91,16 +39,17 @@ export async function generatePreferredDateTime(
     utcOffset: number,
     prompt: string
 ): Promise<string> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: constructPreferredDateTimePrompt(utcOffset, prompt),
-            },
-        ],
-    };
 
-    const response = await generateChatCompletions(app, http, body);
+    const finalPrompt = constructPreferredDateTimePrompt(utcOffset, prompt)
+
+    const response = await handleAIRequest(
+        app,
+        http,
+        {
+            prompt: finalPrompt,
+        }
+    )
+
     return response;
 }
 
@@ -109,18 +58,16 @@ export async function getConstraintArguments(
     http: IHttp,
     prompt: string
 ): Promise<IConstraintArgs> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt),
-            },
-        ],
-        format: "json",
-    };
 
-    const response = await generateChatCompletions(app, http, body);
-    const args: IConstraintArgs = JSON.parse(response);
+    const finalprompt = CONSTRAINT_ARGS_PROMPT.replace("{prompt}", prompt);
+
+    const response = await getJSONResponse(
+        app,
+        http,
+        finalprompt
+    )
+
+    const args: IConstraintArgs = response;
     return args;
 }
 
@@ -131,6 +78,7 @@ export async function generateConstraintPrompt(
     user: IUser,
     prompt: string
 ): Promise<IConstraintArgs> {
+
     const preferredDateTime = await generatePreferredDateTime(
         app,
         http,
@@ -215,18 +163,16 @@ export async function getMeetingArguments(
     http: IHttp,
     prompt: string
 ): Promise<IMeetingArgs> {
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: MEETING_ARGS_PROMPT.replace("{prompt}", prompt),
-            },
-        ],
-        format: "json",
-    };
 
-    const response = await generateChatCompletions(app, http, body);
-    const args: IMeetingArgs = JSON.parse(response);
+    const finalPromt = MEETING_ARGS_PROMPT.replace("{prompt}", prompt)
+
+    const response = await getJSONResponse(
+        app,
+        http,
+        finalPromt
+    )
+
+    const args: IMeetingArgs = response;
 
     return args;
 }
@@ -237,23 +183,24 @@ export async function getFunction(
     user: IUser,
     prompt: string
 ): Promise<IFunctionCall> {
-    const body = {
-        raw: true,
-        messages: [
-            {
-                role: "system",
-                content: constructPreferredDateTimePrompt(
-                    user.utcOffset,
-                    prompt,
-                    ASK_FUNCTION_CALL_PROMPT
-                ),
-            },
-        ],
-        format: "json",
-    };
+    const aiProvider = await app
+    .getAccessors()
+    .environmentReader.getSettings()
+    .getValueById(SettingEnum.AI_PROVIDER_OPTION_ID);
 
-    const response = await generateChatCompletions(app, http, body);
-    return JSON.parse(response) as IFunctionCall;
+    const finalPrompt = constructPreferredDateTimePrompt(
+        user.utcOffset,
+        prompt,
+        ASK_FUNCTION_CALL_PROMPT
+    )
+
+    const response = await getJSONResponse(
+        app,
+        http,
+        finalPrompt
+    )
+
+    return response as IFunctionCall;
 }
 
 export async function getRecommendedTime(
@@ -280,23 +227,22 @@ export async function getRecommendedTime(
         ----------------`;
     });
 
-    const body = {
-        messages: [
-            {
-                role: "system",
-                content: RECOMMENDED_COMMON_TIME_PROMPT.replace(
-                    "{prompt}",
-                    prompt
-                ).replace("{common_time}", commonTimePrompt),
-            },
-        ],
-    };
+    const finalPrompt = RECOMMENDED_COMMON_TIME_PROMPT.replace(
+        "{prompt}",
+        prompt
+    ).replace("{common_time}", commonTimePrompt)
 
-    const response = await generateChatCompletions(app, http, body);
+    const response = await handleAIRequest(
+        app,
+        http,
+        {
+            prompt: finalPrompt,
+        }
+    )
 
     await sendNotification(
-        this.read,
-        this.modify,
+        read,
+        modify,
         user,
         room,
         `Just a little more... ;)`
